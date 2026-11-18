@@ -211,10 +211,91 @@ def preflight(cfg: Config, deck_ip) -> list:
             problems.append("/24 subnet mismatch warning")
     return problems
 
+def derive_deck_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return ""
+
+_DIAG = []
+def record_diag(entry):
+    _DIAG.append(entry)
+    if len(_DIAG) > 20:
+        del _DIAG[:len(_DIAG)-20]
+
 class Plugin:
     async def main(self):
         pass
 
+    async def get_config(self):
+        try:
+            cfg = load_config()
+            return {"config": asdict(cfg)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def save_config(self, data):
+        try:
+            cfg = validate_config(data or {})
+            save_config(cfg)
+            return {"ok": True, "config": asdict(cfg)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def wake(self):
+        try:
+            cfg = load_config()
+            res = await wake(cfg)
+            record_diag({"ts": datetime.now().isoformat(), "op": "wake", **res})
+            return res
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def status(self):
+        try:
+            cfg = load_config()
+            res = await status(cfg)
+            record_diag({"ts": datetime.now().isoformat(), "op": "status", **res})
+            return res
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def preflight(self):
+        try:
+            cfg = load_config()
+            deck_ip = derive_deck_ip()
+            return {"problems": preflight(cfg, deck_ip), "deck_ip": deck_ip}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def test_wake(self):
+        try:
+            cfg = load_config()
+            res = await wake(cfg)
+            return {"rounds": 1, "destinations": res.get("sent_to", []), "failed": res.get("failed", [])}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def test_probe(self):
+        try:
+            cfg = load_config()
+            t0 = time.monotonic()
+            res = await status(cfg)
+            res = dict(res)
+            res["latency_ms"] = res.get("latency_ms")
+            return {"method": res.get("method"), "latency_ms": res.get("latency_ms"), "online": res.get("online")}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def get_diagnostics(self):
+        try:
+            return {"entries": list(_DIAG)}
+        except Exception as e:
+            return {"error": str(e)}
 
 plugin = Plugin()
 try:
