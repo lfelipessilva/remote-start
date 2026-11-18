@@ -1,8 +1,6 @@
 import React from "react";
-import { callable } from "@decky/api";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
-
-const getDiagnostics = callable<[], any>("get_diagnostics");
+import { getDiagnostics } from "./api";
 
 export function Diagnostics({ onBack }: { onBack: () => void }) {
   const [data, setData] = React.useState<any>(null);

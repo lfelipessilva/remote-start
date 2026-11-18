@@ -211,6 +211,75 @@ def preflight(cfg: Config, deck_ip) -> list:
             problems.append("/24 subnet mismatch warning")
     return problems
 
+def _parse_arp_table(text: str, prefix: str) -> list:
+    out = []
+    for line in text.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) >= 4:
+            ip, hw = parts[0], parts[3]
+            if ip.startswith(prefix + ".") and hw and hw != "00:00:00:00:00:00":
+                out.append({"ip": ip, "mac": hw.lower()})
+    return out
+
+
+def _parse_ip_neigh(text: str, prefix: str) -> list:
+    out = []
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[0].startswith(prefix + ".") and "lladdr" in parts:
+            idx = parts.index("lladdr")
+            if idx + 1 < len(parts):
+                mac = parts[idx + 1].lower()
+                if mac and mac != "00:00:00:00:00:00":
+                    out.append({"ip": parts[0], "mac": mac})
+    return out
+
+
+async def discover_devices() -> dict:
+    deck_ip = derive_deck_ip()
+    if not deck_ip:
+        return {"error": "Deck is not on a network"}
+    prefix = ".".join(deck_ip.split(".")[:3])
+
+    sem = asyncio.Semaphore(64)
+
+    async def ping_host(i):
+        async with sem:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "ping", "-c", "1", "-W", "1", f"{prefix}.{i}",
+                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+                )
+                await asyncio.wait_for(proc.wait(), 2.0)
+            except Exception:
+                pass
+
+    try:
+        await asyncio.wait_for(asyncio.gather(*(ping_host(i) for i in range(1, 255))), timeout=12.0)
+    except asyncio.TimeoutError:
+        pass
+
+    found = {}
+    try:
+        for d in _parse_arp_table(Path("/proc/net/arp").read_text(), prefix):
+            found[d["ip"]] = d
+    except Exception:
+        pass
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ip", "neigh", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await proc.communicate()
+        for d in _parse_ip_neigh(out.decode(errors="ignore"), prefix):
+            found[d["ip"]] = d
+    except Exception:
+        pass
+
+    found.pop(deck_ip, None)
+    found.pop(prefix + ".255", None)
+    return {"deck_ip": deck_ip, "devices": [found[ip] for ip in sorted(found, key=lambda s: tuple(map(int, s.split("."))))]}
+
+
 def derive_deck_ip() -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -288,6 +357,14 @@ class Plugin:
             res = dict(res)
             res["latency_ms"] = res.get("latency_ms")
             return {"method": res.get("method"), "latency_ms": res.get("latency_ms"), "online": res.get("online")}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def discover(self):
+        try:
+            res = await discover_devices()
+            record_diag({"ts": datetime.now().isoformat(), "op": "discover", "count": len(res.get("devices", []))})
+            return res
         except Exception as e:
             return {"error": str(e)}
 

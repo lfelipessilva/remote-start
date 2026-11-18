@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { callable, toaster } from "@decky/api";
-
-const getConfig = callable<[], any>("get_config");
-const wakeRpc = callable<[], any>("wake");
-const statusRpc = callable<[], any>("status");
+import { toaster } from "@decky/api";
+import { Config, Status, getConfig, wakePc, statusPc } from "./api";
 
 export type State = "needs_setup" | "ready" | "checking" | "online" | "offline" | "waking" | "timed_out" | "error";
-
-export interface Config { alias: string; mac: string; ip: string; broadcast: string; probe_port: number; }
-export interface Status { online: boolean; method: string; latency_ms: number | null; }
 
 export function useWakeState() {
   const [state, setState] = useState<State>("checking");
@@ -27,8 +21,8 @@ export function useWakeState() {
       const cfg = (r?.config ?? r) as Config;
       setConfig(cfg);
       if (!cfg || !cfg.mac) { setState("needs_setup"); return; }
-      setState((prev) => (prev === "waking" ? "waking" : "checking"));
-      const st: any = await statusRpc();
+      if (!wakingRef.current) setState("checking");
+      const st: any = await statusPc();
       setStatus(st);
       setLastChecked(Date.now());
       if (wakingRef.current && st?.online) {
@@ -52,7 +46,6 @@ export function useWakeState() {
     return () => clearInterval(id);
   }, [state, refresh]);
 
-  // toasts on transition out of waking
   useEffect(() => {
     if (wasWakingRef.current && state === "online") {
       toaster.toast({ title: `${config?.alias ?? "PC"} is online`, body: "" });
@@ -75,7 +68,7 @@ export function useWakeState() {
     }, 120000);
     wakeCleanupRef.current = () => clearTimeout(timeoutId);
     try {
-      await wakeRpc();
+      await wakePc();
     } catch (e) {
       wakingRef.current = false;
       clearTimeout(timeoutId);
