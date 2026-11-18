@@ -17,6 +17,7 @@ except Exception:
 
 SCHEMA_VERSION = 2
 SUPPORTED_SCHEMA_VERSIONS = (1, 2)
+_ARP_PATH = Path("/proc/net/arp")
 last_reset_reason = None
 
 @dataclass
@@ -120,6 +121,18 @@ def derive_subnet_broadcast(ip: str):
     return ".".join(parts[:3] + ["255"])
 
 async def wake(cfg: Config) -> dict:
+    if not cfg.mac:
+        resolved = await resolve_mac(cfg.ip)
+        if not resolved:
+            return {
+                "error": "mac_unknown",
+                "message": "MAC address unknown. Turn the PC on once, save again, or use Discover.",
+            }
+        cfg.mac = resolved
+        try:
+            save_config(cfg)
+        except Exception:
+            pass
     mac = cfg.mac
     packet = build_magic_packet(mac)
     destinations = [cfg.broadcast, derive_subnet_broadcast(cfg.ip), cfg.ip]
@@ -241,6 +254,56 @@ def _parse_ip_neigh(text: str, prefix: str) -> list:
     return out
 
 
+def _find_mac_in_arp(text: str, ip: str):
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[0] == ip and parts[3] != "00:00:00:00:00:00":
+            try:
+                return normalize_mac(parts[3])
+            except ValueError:
+                return None
+    return None
+
+
+def _find_mac_in_neigh(text: str, ip: str):
+    for line in text.splitlines():
+        parts = line.split()
+        if parts and parts[0] == ip and "lladdr" in parts:
+            idx = parts.index("lladdr")
+            if idx + 1 < len(parts) and parts[idx + 1] != "00:00:00:00:00:00":
+                try:
+                    return normalize_mac(parts[idx + 1])
+                except ValueError:
+                    return None
+    return None
+
+
+async def resolve_mac(ip: str):
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ping", "-c", "1", "-W", "1000", ip,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.wait(), 2.0)
+    except Exception:
+        pass
+    try:
+        if _ARP_PATH.exists():
+            mac = _find_mac_in_arp(_ARP_PATH.read_text(errors="ignore"), ip)
+            if mac:
+                return mac
+    except Exception:
+        pass
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ip", "neigh", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await proc.communicate()
+        return _find_mac_in_neigh(out.decode(errors="ignore"), ip)
+    except Exception:
+        return None
+
+
 async def discover_devices() -> dict:
     deck_ip = derive_deck_ip()
     if not deck_ip:
@@ -316,8 +379,23 @@ class Plugin:
     async def save_config(self, data):
         try:
             cfg = validate_config(data or {})
+            if not cfg.mac:
+                mac = await resolve_mac(cfg.ip)
+                if mac:
+                    cfg.mac = mac
             save_config(cfg)
-            return {"ok": True, "config": asdict(cfg)}
+            return {"ok": True, "config": asdict(cfg), "mac_resolved": bool(cfg.mac)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def learn_mac(self):
+        try:
+            cfg = load_config()
+            mac = await resolve_mac(cfg.ip)
+            if mac:
+                cfg.mac = mac
+                save_config(cfg)
+            return {"mac": mac}
         except Exception as e:
             return {"error": str(e)}
 
