@@ -101,17 +101,44 @@ built into Windows. Setup is one-time.
 
 ### 1. Enable OpenSSH Server on the PC
 
-Open PowerShell **as administrator** and run:
+Open PowerShell **as administrator**. First check whether it is already
+installed — on many Windows 11 builds it is, just stopped:
+
+```powershell
+Get-WindowsCapability -Online -Name OpenSSH.Server*
+```
+
+If it says `State : Installed`, skip to the service commands below.
+
+Otherwise install it. `Add-WindowsCapability` is the built-in way, but it
+downloads the feature from Windows Update and can take several minutes:
 
 ```powershell
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+```
+
+**Faster alternative** (a ~10 MB installer instead of a Windows Update round
+trip, usually under a minute):
+
+```powershell
+winget install --id Microsoft.OpenSSH.Beta -e --accept-source-agreements
+```
+
+Or download the MSI from
+<https://github.com/PowerShell/Win32-OpenSSH/releases> and run
+`msiexec /i OpenSSH-Win64-*.msi /qn`.
+
+Then, in either case:
+
+```powershell
 Start-Service sshd
 Set-Service -Name sshd -StartupType Automatic
 New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' `
   -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
 ```
 
-Check that it is listening with `Get-Service sshd`.
+Check that it is listening with `Get-Service sshd`, then confirm from the Deck
+with `ssh -p 22 <user>@<pc-ip>` (password prompt means it works).
 
 ### 2. Configure it in the plugin
 
