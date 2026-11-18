@@ -4,6 +4,7 @@ import re
 import socket
 import asyncio
 import tempfile
+import time
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
@@ -143,6 +144,72 @@ async def wake(cfg: Config) -> dict:
                 if i < 2:
                     await asyncio.sleep(0.15)
     return {"mac": mac, "sent_to": sent_to, "failed": failed}
+
+async def status(cfg: Config) -> dict:
+    ping_ok = False
+    tcp_ok = False
+    ping_latency = None
+    tcp_latency = None
+
+    async def do_ping():
+        nonlocal ping_ok, ping_latency
+        t0 = time.monotonic()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "ping", "-c", "1", "-W", "1000", cfg.ip,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+            if proc.returncode == 0:
+                ping_ok = True
+                ping_latency = int((time.monotonic() - t0) * 1000)
+        except Exception:
+            pass
+
+    async def do_tcp():
+        nonlocal tcp_ok, tcp_latency
+        if not cfg.probe_port:
+            return
+        t0 = time.monotonic()
+        try:
+            reader, writer = await asyncio.open_connection(cfg.ip, cfg.probe_port)
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            tcp_ok = True
+            tcp_latency = int((time.monotonic() - t0) * 1000)
+        except Exception:
+            pass
+
+    try:
+        await asyncio.wait_for(asyncio.gather(do_ping(), do_tcp()), timeout=4.0)
+    except asyncio.TimeoutError:
+        pass
+
+    if ping_ok:
+        return {"online": True, "method": "ping", "latency_ms": ping_latency}
+    if tcp_ok:
+        return {"online": True, "method": "tcp", "latency_ms": tcp_latency}
+    return {"online": False, "method": "none", "latency_ms": None}
+
+def preflight(cfg: Config, deck_ip) -> list:
+    problems = []
+    if not cfg.mac:
+        problems.append("missing MAC address")
+    if not cfg.ip:
+        problems.append("missing IP address")
+    # broadcast validity
+    try:
+        _validate_ip(cfg.broadcast)
+    except Exception:
+        problems.append("illegal broadcast address")
+    # /24 mismatch warning
+    if deck_ip and cfg.ip:
+        if cfg.ip.split(".")[:3] != str(deck_ip).split(".")[:3]:
+            problems.append("/24 subnet mismatch warning")
+    return problems
 
 class Plugin:
     async def main(self):
