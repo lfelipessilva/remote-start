@@ -20,8 +20,6 @@ network**.
 
 ## Where to find the values
 
-### Windows
-
 Open Command Prompt or PowerShell on the PC:
 
 ```bat
@@ -36,13 +34,6 @@ Address* of the same adapter; the plugin fills it in automatically.
 To avoid the IP changing later, give the PC a DHCP reservation in your router,
 or set a static IP.
 
-### Linux
-
-```sh
-ip -4 addr       # IPv4 after "inet"
-ip link          # MAC after "link/ether" (optional)
-```
-
 ## What each field means
 
 | Field | What to put | Example |
@@ -51,7 +42,7 @@ ip link          # MAC after "link/ether" (optional)
 | PC IP | The PC's LAN IPv4 (required) | `192.168.1.42` |
 | MAC address | Learned automatically; editable under Advanced | `aa:bb:cc:dd:ee:ff` |
 | Broadcast | Derived from the IP; editable under Advanced | `192.168.1.255` |
-| Probe port | Optional TCP port for status (22, 445, 3389) | empty = ping only |
+| Probe port | Optional TCP port for status (445, 3389) | empty = ping + ARP |
 
 Only **PC IP** is required. The first save (or **Find on network**) needs the PC
 to be on so its MAC can be learned.
@@ -72,7 +63,7 @@ to be on so its MAC can be learned.
 - **Send test packet** — sends one wake round and reports where it went. Useful
   to check the broadcast address without waiting for a boot.
 - **Test status probe** — runs the online check once and shows the method
-  (ping/TCP) and latency. Useful to confirm the IP is right.
+  (ping, ARP or TCP) and latency. Useful to confirm the IP is right.
 - **Diagnostics** — last attempts, destinations, and a **Copy diagnostics**
   button for support.
 
@@ -81,15 +72,16 @@ to be on so its MAC can be learned.
 | Dot / state | Meaning |
 |-------------|---------|
 | `needs_setup` | PC IP missing — open Settings |
-| `online` | PC answered ping or the probe port |
-| `offline` | No answer. Either the PC is off, or it is on but blocks ICMP and no probe port is set |
+| `online` | PC answered ping, appeared in the LAN neighbour table (ARP), or accepted the probe port |
+| `offline` | No answer. Either the PC is off, or the network is blocking ARP/ping |
 | `waking` | Wake sent, waiting for the PC to answer |
 | `timed_out` | 2 minutes passed with no answer |
 | `error` | Backend call failed, or the MAC is still unknown — check Diagnostics |
 
-`offline` while the PC is actually on almost always means ICMP is blocked. Set
-**Probe port** to a port the PC listens on (22 for SSH, 445 for SMB, 3389 for
-RDP) and save.
+`offline` while the PC is actually on usually means the Deck cannot see the PC's
+MAC at all: check that both are on the same subnet. Windows blocks ping by
+default, which is why the plugin also uses the LAN neighbour table (ARP) to
+detect an online PC.
 
 ## Enable Wake-on-LAN on the PC
 
@@ -145,7 +137,7 @@ Or use Decky → Developer → *Install Plugin from ZIP File*.
 | `manifest is not defined` / `React is not defined` | Old build. Rebuild and reinstall; the current build uses `@decky/rollup`. |
 | Wake sent but PC stays off | Check WoL in BIOS and NIC; disable Fast Startup; confirm same subnet. |
 | Wake says "MAC address unknown" | Turn the PC on (same network) and press **Save** or **Retry learning MAC**. The MAC must be learned while the PC is visible. |
-| Status says Offline while PC is on | Set a Probe port, or allow ICMP through the PC firewall. |
+| Status says Offline while PC is on | Make sure the Deck and PC are on the same subnet, then press Refresh. The plugin checks ping, the LAN neighbour table (ARP) and an optional Probe port. |
 | Status is stale | Press Refresh; polling is every 5 s while the panel is open. |
 
 Decky backend logs: `journalctl -u plugin_loader -n 100 --no-pager`.

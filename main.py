@@ -164,6 +164,37 @@ async def wake(cfg: Config) -> dict:
                     await asyncio.sleep(0.15)
     return {"mac": mac, "sent_to": sent_to, "failed": failed}
 
+async def _neighbour_mac(ip: str):
+    """MAC for ip from the kernel's neighbour cache, or None.
+
+    The cache is populated by ARP even when the PC's firewall drops ICMP, so
+    this is a reliable "is it on the LAN" check for Windows PCs.
+    """
+    try:
+        if _ARP_PATH.exists():
+            mac = _find_mac_in_arp(_ARP_PATH.read_text(errors="ignore"), ip)
+            if mac:
+                return mac
+    except Exception:
+        pass
+    proc = None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ip", "neigh", "show", ip,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), 2.0)
+        return _find_mac_in_neigh(out.decode(errors="ignore"), ip)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return None
+    except Exception:
+        return None
+
+
 async def status(cfg: Config) -> dict:
     ping_ok = False
     tcp_ok = False
@@ -173,15 +204,21 @@ async def status(cfg: Config) -> dict:
     async def do_ping():
         nonlocal ping_ok, ping_latency
         t0 = time.monotonic()
+        proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
-                "ping", "-c", "1", "-W", "1000", cfg.ip,
+                "ping", "-c", "1", "-W", "1", cfg.ip,
                 stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
             )
-            await proc.wait()
+            await asyncio.wait_for(proc.wait(), 2.5)
             if proc.returncode == 0:
                 ping_ok = True
                 ping_latency = int((time.monotonic() - t0) * 1000)
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -211,6 +248,12 @@ async def status(cfg: Config) -> dict:
         return {"online": True, "method": "ping", "latency_ms": ping_latency}
     if tcp_ok:
         return {"online": True, "method": "tcp", "latency_ms": tcp_latency}
+    try:
+        neighbour = await asyncio.wait_for(_neighbour_mac(cfg.ip), 2.5)
+    except Exception:
+        neighbour = None
+    if neighbour:
+        return {"online": True, "method": "arp", "latency_ms": None}
     return {"online": False, "method": "none", "latency_ms": None}
 
 def preflight(cfg: Config, deck_ip) -> list:

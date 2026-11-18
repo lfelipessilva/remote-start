@@ -36,12 +36,14 @@ async def test_status_tcp_fallback():
     assert res["method"] == "tcp"
 
 @pytest.mark.asyncio
-async def test_status_offline():
+async def test_status_offline(monkeypatch):
     cfg = Config(mac="aa:bb:cc:dd:ee:ff", ip="192.168.1.42", probe_port=445)
     fake_proc = mock.MagicMock()
     fake_proc.returncode = 1
     async def wait(): return 1
     fake_proc.wait = wait
+    async def no_neighbour(ip): return None
+    monkeypatch.setattr("main._neighbour_mac", no_neighbour)
     async def open_conn(host, port): raise OSError("nope")
     with mock.patch("asyncio.create_subprocess_exec", return_value=fake_proc), \
          mock.patch("asyncio.open_connection", side_effect=open_conn):
@@ -62,3 +64,35 @@ def test_preflight():
     probs2 = preflight(cfg2, "10.0.0.5")
     joined2 = " ".join(probs2).lower()
     assert "24" in joined2 or "subnet" in joined2 or "mismatch" in joined2
+
+
+@pytest.mark.asyncio
+async def test_status_arp_fallback_when_icmp_blocked(monkeypatch):
+    cfg = Config(mac="aa:bb:cc:dd:ee:ff", ip="192.168.1.42")
+    fake_proc = mock.MagicMock()
+    fake_proc.returncode = 1
+    async def wait(): return 1
+    fake_proc.wait = wait
+    async def neighbour(ip):
+        assert ip == "192.168.1.42"
+        return "aa:bb:cc:dd:ee:ff"
+    monkeypatch.setattr("main._neighbour_mac", neighbour)
+    with mock.patch("asyncio.create_subprocess_exec", return_value=fake_proc):
+        res = await status(cfg)
+    assert res["online"] is True
+    assert res["method"] == "arp"
+
+
+@pytest.mark.asyncio
+async def test_status_offline_when_neighbour_absent(monkeypatch):
+    cfg = Config(mac="", ip="192.168.1.42")
+    fake_proc = mock.MagicMock()
+    fake_proc.returncode = 1
+    async def wait(): return 1
+    fake_proc.wait = wait
+    async def no_neighbour(ip): return None
+    monkeypatch.setattr("main._neighbour_mac", no_neighbour)
+    with mock.patch("asyncio.create_subprocess_exec", return_value=fake_proc):
+        res = await status(cfg)
+    assert res["online"] is False
+    assert res["method"] == "none"
