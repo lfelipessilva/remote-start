@@ -26,7 +26,7 @@ var WakePc = (function (React, _manifest) {
     api.addEventListener;
     api.removeEventListener;
     api.routerHook;
-    api.toaster;
+    const toaster = api.toaster;
     api.openFilePicker;
     api.executeInTab;
     api.injectCssIntoTab;
@@ -253,6 +253,7 @@ var WakePc = (function (React, _manifest) {
         const [canWake, setCanWake] = React.useState(true);
         const wakingRef = React.useRef(false);
         const rateUntil = React.useRef(0);
+        const wakeCleanupRef = React.useRef(null);
         const refresh = React.useCallback(async () => {
             try {
                 const cfg = await serverApi.callPluginMethod("get_config", {});
@@ -272,6 +273,7 @@ var WakePc = (function (React, _manifest) {
             }
         }, [serverApi]);
         React.useEffect(() => { refresh(); }, [refresh]);
+        React.useEffect(() => () => { wakeCleanupRef.current?.(); }, []);
         React.useEffect(() => {
             const interval = state === "waking" ? 2000 : 5000;
             const id = setInterval(() => { refresh(); }, interval);
@@ -305,16 +307,18 @@ var WakePc = (function (React, _manifest) {
                         clearInterval(iv);
                         wakingRef.current = false;
                         setState("online");
+                        toaster.toast({ title: `${config?.mac ?? "PC"} is online` });
                     }
                     else if (Date.now() - start > (config?.timeout ?? 30) * 1000) {
                         clearInterval(iv);
                         wakingRef.current = false;
                         setState("timed_out");
+                        toaster.toast({ title: "No response after 2 min..." });
                     }
                 }, 2000);
                 // unmount guard
                 const cleanup = () => { cancelled = true; clearInterval(iv); };
-                wake._cleanup = cleanup;
+                wakeCleanupRef.current = cleanup;
             }
             catch (e) {
                 wakingRef.current = false;

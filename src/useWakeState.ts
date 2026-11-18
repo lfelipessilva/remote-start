@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ServerAPI } from "@decky/api";
+import { ServerAPI, toaster } from "@decky/api";
 
 export type State = "needs_setup" | "ready" | "checking" | "online" | "offline" | "waking" | "timed_out" | "error";
 
@@ -14,6 +14,7 @@ export function useWakeState(serverApi: ServerAPI) {
   const [canWake, setCanWake] = useState<boolean>(true);
   const wakingRef = useRef<boolean>(false);
   const rateUntil = useRef<number>(0);
+  const wakeCleanupRef = useRef<(() => void) | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -31,6 +32,8 @@ export function useWakeState(serverApi: ServerAPI) {
   }, [serverApi]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => () => { wakeCleanupRef.current?.(); }, []);
 
   useEffect(() => {
     const interval = state === "waking" ? 2000 : 5000;
@@ -55,12 +58,12 @@ export function useWakeState(serverApi: ServerAPI) {
         if (cancelled) { clearInterval(iv); return; }
         setStatus(st);
         setLastChecked(Date.now());
-        if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); }
-        else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); }
+        if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); toaster.toast({ title: `${config?.mac ?? "PC"} is online` }); }
+        else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); toaster.toast({ title: "No response after 2 min..." }); }
       }, 2000);
       // unmount guard
       const cleanup = () => { cancelled = true; clearInterval(iv); };
-      (wake as any)._cleanup = cleanup;
+      wakeCleanupRef.current = cleanup;
     } catch (e) {
       wakingRef.current = false;
       setState("error");
