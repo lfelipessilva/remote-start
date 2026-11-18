@@ -1,0 +1,11 @@
+{
+  "name": "wake-pc",
+  "author": "placeholder",
+  "flags": [],
+  "publish": {
+    "tags": [],
+    "description": "Wake a PC from the Quick Access Menu"
+  },
+  "version": "0.1.0",
+  "api_version": 1
+}
