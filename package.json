@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
-    "package": "pnpm build && rm -rf .pkg wake-pc.zip && mkdir -p .pkg/wake-pc && cp plugin.json main.py package.json README.md LICENSE .pkg/wake-pc/ && cp -r dist .pkg/wake-pc/ && cd .pkg && zip -r -q ../wake-pc.zip wake-pc && cd .. && rm -rf .pkg"
+    "package": "pnpm build && rm -rf .pkg wake-pc.zip && mkdir -p .pkg/wake-pc && cp plugin.json main.py package.json README.md LICENSE .pkg/wake-pc/ && cp -r dist backend .pkg/wake-pc/ && cd .pkg && zip -r -q ../wake-pc.zip wake-pc && cd .. && rm -rf .pkg"
   },
   "dependencies": {
     "@decky/api": "latest",

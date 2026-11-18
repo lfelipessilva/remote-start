@@ -1,6 +1,6 @@
 node_modules/
-dist/
 __pycache__/
-*.pyc
-.superpowers/
-.pkg/
+.DS_Store
+dist/
+backend/out/
+*.zip

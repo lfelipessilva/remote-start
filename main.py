@@ -1,12 +1,12 @@
-from backend.config import *
-from backend.network import *
-from backend.shutdown import *
-from backend.wake import *
-import backend.config as _c
+from backend.src.config import *
+from backend.src.network import *
+from backend.src.shutdown import *
+from backend.src.wake import *
+import backend.src.config as _c
 # expose module-level private names tests expect
-import backend.network as _n
-import backend.shutdown as _s
-import backend.wake as _w
+import backend.src.network as _n
+import backend.src.shutdown as _s
+import backend.src.wake as _w
 for _m in (_c, _n, _s, _w):
     for _k, _v in vars(_m).items():
         globals()[_k] = _v
