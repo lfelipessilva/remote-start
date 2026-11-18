@@ -5,16 +5,18 @@ Menu using Wake-on-LAN, and shows whether the PC is currently on.
 
 ## Quick start (3 steps)
 
-1. **Turn the PC on** (discovery can only see a machine that is on).
-2. QAM → **Wake PC** → **Settings** → **Discover PC on network**, then tap your
-   PC in the list. That fills in its IP and MAC. Save.
+1. **Turn the PC on once** (the plugin learns its MAC from the network; a
+   switched-off PC is invisible).
+2. QAM → **Wake PC** → **Settings** → **Enter IP** (gamepad keypad) or **Find on
+   network**, then tap your PC. Save.
 3. **Press Wake.** Watch the dot: Offline → Waking → Online.
 
-Discovery sweeps your subnet and lists devices that answer, with their MACs.
-A switched-off PC cannot be discovered, so this is a one-time setup step: after
-you save the MAC, waking works while the PC is off.
+Only the PC's IP is required. The plugin looks the MAC up in the Deck's ARP table
+and caches it, and derives the broadcast address from the IP. After that first
+setup, waking works while the PC is off.
 
-If discovery doesn't find it, enter the MAC and IP by hand (see below).
+If you already know the IP, type it. If not, turn the PC on and use **Find on
+network**.
 
 ## Where to find the values
 
@@ -23,12 +25,13 @@ If discovery doesn't find it, enter the MAC and IP by hand (see below).
 Open Command Prompt or PowerShell on the PC:
 
 ```bat
-ipconfig /all
+ipconfig
 ```
 
-- **MAC address**: the *Physical Address* of the active adapter (e.g.
-  `AA-BB-CC-DD-EE-FF`). Enter it as `AA:BB:CC:DD:EE:FF` or `AABBCCDDEEFF`.
-- **PC IP**: the *IPv4 Address* of the same adapter (e.g. `192.168.1.42`).
+- **PC IP**: the *IPv4 Address* of the active adapter (e.g. `192.168.1.42`).
+
+You only need the IP. If you are curious, the MAC address is the *Physical
+Address* of the same adapter; the plugin fills it in automatically.
 
 To avoid the IP changing later, give the PC a DHCP reservation in your router,
 or set a static IP.
@@ -36,31 +39,35 @@ or set a static IP.
 ### Linux
 
 ```sh
-ip link          # MAC after "link/ether"
 ip -4 addr       # IPv4 after "inet"
+ip link          # MAC after "link/ether" (optional)
 ```
 
 ## What each field means
 
 | Field | What to put | Example |
 |-------|-------------|---------|
-| Alias | Name shown in the panel | `Gaming PC` |
-| MAC address | The PC's network card MAC | `aa:bb:cc:dd:ee:ff` |
-| PC IP | The PC's LAN IPv4 (used for status) | `192.168.1.42` |
-| Broadcast | Where the wake packet is sent | `255.255.255.255` |
+| Alias | Name shown in the panel (optional) | `Gaming PC` |
+| PC IP | The PC's LAN IPv4 (required) | `192.168.1.42` |
+| MAC address | Learned automatically; editable under Advanced | `aa:bb:cc:dd:ee:ff` |
+| Broadcast | Derived from the IP; editable under Advanced | `192.168.1.255` |
 | Probe port | Optional TCP port for status (22, 445, 3389) | empty = ping only |
 
-Only **MAC** and **PC IP** are required. Defaults work for most home networks.
+Only **PC IP** is required. The first save (or **Find on network**) needs the PC
+to be on so its MAC can be learned.
 
 ## What the buttons do
 
 - **Wake** — sends the magic packet and watches for the PC to answer for up to
   2 minutes. Disabled while the PC is already online or during an attempt.
 - **Refresh** — re-checks the status right now.
-- **Settings** — edit the fields above. Nothing is written until you press Save.
-  Text fields open the Steam on-screen keyboard, so they work from the gamepad.
-- **Discover PC on network** (in Settings) — scans the subnet and lists devices
-  that are currently on; tap one to fill in its IP and MAC automatically.
+- **Settings** — enter the PC IP with the gamepad keypad, or tap **Find on
+  network**. No Steam on-screen keyboard is used. **Advanced** exposes MAC,
+  broadcast and probe port if you ever need them.
+- **Enter IP** — gamepad keypad for the address; OK saves immediately.
+- **Find on network** (in Settings) — scans the subnet and lists devices that
+  are currently on; tap one to use its IP and MAC automatically.
+- **Retry learning MAC** — shown while no MAC is known; run it with the PC on.
 - **Send test packet** — sends one wake round and reports where it went. Useful
   to check the broadcast address without waiting for a boot.
 - **Test status probe** — runs the online check once and shows the method
@@ -72,12 +79,12 @@ Only **MAC** and **PC IP** are required. Defaults work for most home networks.
 
 | Dot / state | Meaning |
 |-------------|---------|
-| `needs_setup` | MAC or IP missing — open Settings |
+| `needs_setup` | PC IP missing — open Settings |
 | `online` | PC answered ping or the probe port |
 | `offline` | No answer. Either the PC is off, or it is on but blocks ICMP and no probe port is set |
 | `waking` | Wake sent, waiting for the PC to answer |
 | `timed_out` | 2 minutes passed with no answer |
-| `error` | Backend call failed — check Diagnostics / Decky logs |
+| `error` | Backend call failed, or the MAC is still unknown — check Diagnostics |
 
 `offline` while the PC is actually on almost always means ICMP is blocked. Set
 **Probe port** to a port the PC listens on (22 for SSH, 445 for SMB, 3389 for
@@ -136,6 +143,7 @@ Or use Decky → Developer → *Install Plugin from ZIP File*.
 | Plugin does not appear in Decky | Zip had no `wake-pc/` top-level folder, or the file name did not match. Rebuild with `pnpm package` and reinstall. |
 | `manifest is not defined` / `React is not defined` | Old build. Rebuild and reinstall; the current build uses `@decky/rollup`. |
 | Wake sent but PC stays off | Check WoL in BIOS and NIC; disable Fast Startup; confirm same subnet. |
+| Wake says "MAC address unknown" | Turn the PC on (same network) and press **Save** or **Retry learning MAC**. The MAC must be learned while the PC is visible. |
 | Status says Offline while PC is on | Set a Probe port, or allow ICMP through the PC firewall. |
 | Status is stale | Press Refresh; polling is every 5 s while the panel is open. |
 
