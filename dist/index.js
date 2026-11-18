@@ -307,13 +307,13 @@ var WakePc = (function (React, _manifest) {
                         clearInterval(iv);
                         wakingRef.current = false;
                         setState("online");
-                        toaster.toast({ title: `${config?.mac ?? "PC"} is online` });
+                        toaster.toast({ title: `${config?.mac ?? "PC"} is online`, body: "" });
                     }
                     else if (Date.now() - start > (config?.timeout ?? 30) * 1000) {
                         clearInterval(iv);
                         wakingRef.current = false;
                         setState("timed_out");
-                        toaster.toast({ title: "No response after 2 min..." });
+                        toaster.toast({ title: "No response after 2 min...", body: "" });
                     }
                 }, 2000);
                 // unmount guard

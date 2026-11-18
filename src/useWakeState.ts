@@ -58,8 +58,8 @@ export function useWakeState(serverApi: ServerAPI) {
         if (cancelled) { clearInterval(iv); return; }
         setStatus(st);
         setLastChecked(Date.now());
-        if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); toaster.toast({ title: `${config?.mac ?? "PC"} is online` }); }
-        else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); toaster.toast({ title: "No response after 2 min..." }); }
+        if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); toaster.toast({ title: `${config?.mac ?? "PC"} is online`, body: "" }); }
+        else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); toaster.toast({ title: "No response after 2 min...", body: "" }); }
       }, 2000);
       // unmount guard
       const cleanup = () => { cancelled = true; clearInterval(iv); };

@@ -234,3 +234,8 @@ def test_corrupt_config_resets(tmp_path, monkeypatch):
 ## Self-review notes
 
 Spec coverage: config (T2), wake (T3), status+preflight (T4), plugin wiring (T5), state machine+polling (T6), settings+tests (T7), diagnostics (T8), install docs (T9), e2e (T10). Review Focus items each map to T4 (1,2), T6 (3,5), T2 (4). No gaps found.
+
+## Verification (Task 10)
+- pnpm build: clean, dist/index.js created.
+- pytest -q: 16 passed.
+- Decky CLI zip packaging is manual (`decky plugin build`) and requires the Deck; not performed here.
