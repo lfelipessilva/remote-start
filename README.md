@@ -5,14 +5,16 @@ Menu using Wake-on-LAN, and shows whether the PC is currently on.
 
 ## Quick start (3 steps)
 
-1. **Find your PC's MAC address and LAN IP** (see below).
-2. **Enter them once** in the plugin: QAM → **Wake PC** → **Settings**. Save.
+1. **Turn the PC on** (discovery can only see a machine that is on).
+2. QAM → **Wake PC** → **Settings** → **Discover PC on network**, then tap your
+   PC in the list. That fills in its IP and MAC. Save.
 3. **Press Wake.** Watch the dot: Offline → Waking → Online.
 
-There is **no automatic discovery** in this version. The plugin cannot see a PC
-that is switched off (a powered-off network card does not answer), so discovery
-would only ever work while the PC is already on — which defeats the purpose.
-Instead you enter the MAC once and it is saved.
+Discovery sweeps your subnet and lists devices that answer, with their MACs.
+A switched-off PC cannot be discovered, so this is a one-time setup step: after
+you save the MAC, waking works while the PC is off.
+
+If discovery doesn't find it, enter the MAC and IP by hand (see below).
 
 ## Where to find the values
 
@@ -56,6 +58,9 @@ Only **MAC** and **PC IP** are required. Defaults work for most home networks.
   2 minutes. Disabled while the PC is already online or during an attempt.
 - **Refresh** — re-checks the status right now.
 - **Settings** — edit the fields above. Nothing is written until you press Save.
+  Text fields open the Steam on-screen keyboard, so they work from the gamepad.
+- **Discover PC on network** (in Settings) — scans the subnet and lists devices
+  that are currently on; tap one to fill in its IP and MAC automatically.
 - **Send test packet** — sends one wake round and reports where it went. Useful
   to check the broadcast address without waiting for a boot.
 - **Test status probe** — runs the online check once and shows the method
