@@ -38,7 +38,6 @@ or set a static IP.
 
 | Field | What to put | Example |
 |-------|-------------|---------|
-| Alias | Name shown in the panel (optional) | `Gaming PC` |
 | PC IP | The PC's LAN IPv4 (required) | `192.168.1.42` |
 | MAC address | Learned automatically; editable under Advanced | `aa:bb:cc:dd:ee:ff` |
 | Broadcast | Derived from the IP; editable under Advanced | `192.168.1.255` |
@@ -138,6 +137,6 @@ Or use Decky → Developer → *Install Plugin from ZIP File*.
 | Wake sent but PC stays off | Check WoL in BIOS and NIC; disable Fast Startup; confirm same subnet. |
 | Wake says "MAC address unknown" | Turn the PC on (same network) and press **Save** or **Retry learning MAC**. The MAC must be learned while the PC is visible. |
 | Status says Offline while PC is on | Make sure the Deck and PC are on the same subnet, then press Refresh. The plugin checks ping, the LAN neighbour table (ARP) and an optional Probe port. |
-| Status is stale | Press Refresh; polling is every 5 s while the panel is open. |
+| Status is stale | Press **Refresh**. The status is checked once when the panel opens, then only while a wake is in progress. |
 
 Decky backend logs: `journalctl -u plugin_loader -n 100 --no-pager`.

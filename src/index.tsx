@@ -34,20 +34,19 @@ function Panel() {
 
   const secs = Math.max(0, Math.ceil((w.rateUntil.current - now) / 1000));
   const blocked = !w.canWake || ["needs_setup", "error", "waking", "timed_out"].includes(w.state);
-  const alias = w.config?.alias || "My PC";
   const method = w.status?.method && w.status.method !== "none" ? ` via ${w.status.method}` : "";
   const latency = w.status?.latency_ms != null ? ` (${w.status.latency_ms} ms)` : "";
   const checked = Math.max(0, Math.round((now - w.lastChecked) / 1000));
 
   const wakeLabel = w.state === "waking" ? "Waking…"
     : blocked ? `Wake (${LABEL[w.state].toLowerCase()})`
-    : !w.canWake ? `Wake (${secs}s)` : `Wake ${alias}`;
+    : !w.canWake ? `Wake (${secs}s)` : `Wake PC`;
 
   return React.createElement(PanelSection, { title: "Wake PC" },
     React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "2px 0" } },
         React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }),
-        React.createElement("span", { style: { fontWeight: 600 } }, alias),
+        React.createElement("span", { style: { fontWeight: 600 } }, "PC"),
         React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, opacity: 0.8 } }, LABEL[w.state])
       )
     ),

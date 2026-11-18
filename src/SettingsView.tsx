@@ -72,15 +72,14 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
 
   const edit = (key: keyof Config) => {
     const value = String((form as any)[key] ?? "");
-    const title = key === "ip" ? "PC IP address" : key === "mac" ? "MAC address" : key === "broadcast" ? "Broadcast address" : key === "probe_port" ? "Probe port" : "PC name";
-    const label = key === "alias" ? "Name" : key === "ip" ? "IPv4 address" : key === "mac" ? "MAC" : key === "broadcast" ? "Broadcast" : "TCP port";
-    const kind = key === "probe_port" ? "port" : key === "alias" ? "alias" : (key as "ip" | "mac" | "broadcast");
+    const title = key === "ip" ? "PC IP address" : key === "mac" ? "MAC address" : key === "broadcast" ? "Broadcast address" : "Probe port";
+    const label = key === "ip" ? "IPv4 address" : key === "mac" ? "MAC" : key === "broadcast" ? "Broadcast" : "TCP port";
+    const kind = key === "probe_port" ? "port" : (key as "ip" | "mac" | "broadcast");
     const hint =
       key === "ip" ? "The PC's LAN address, for example 192.168.1.42"
       : key === "mac" ? "Learned automatically. Leave empty to learn it again."
       : key === "broadcast" ? "Leave empty to derive it from the PC address."
-      : key === "probe_port" ? "Optional. Leave empty to use ping only."
-      : "Name shown in the panel (optional)";
+      : "Optional. Leave empty to use ping and ARP only.";
 
     openFieldEditor({
       title,
@@ -171,8 +170,6 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     );
 
   return React.createElement(PanelSection, { title: "Settings" },
-    field("PC name", form.alias, "alias", "Change name"),
-
     field("PC address", form.ip, "ip", form.ip ? "Change IP address" : "Enter IP address"),
     ipError ? React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { color: "#ef4444", fontSize: 12 } }, ipError)

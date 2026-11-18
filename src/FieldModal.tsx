@@ -1,7 +1,7 @@
 import React from "react";
 import { ConfirmModal, TextField, showModal } from "@decky/ui";
 
-export type FieldKind = "ip" | "mac" | "broadcast" | "port" | "alias";
+export type FieldKind = "ip" | "mac" | "broadcast" | "port";
 
 interface FieldSpec {
   title: string;
@@ -19,10 +19,7 @@ const sanitize = (raw: string, kind: FieldKind): string => {
   if (kind === "mac") {
     return raw.replace(/[^0-9a-fA-F:.-]/g, "").slice(0, 17);
   }
-  if (kind === "port") {
-    return raw.replace(/[^0-9]/g, "").slice(0, 5);
-  }
-  return raw.slice(0, 32);
+  return raw.replace(/[^0-9]/g, "").slice(0, 5);
 };
 
 const validIpv4 = (v: string): boolean => {

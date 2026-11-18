@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toaster } from "@decky/api";
+import { useQuickAccessVisible } from "@decky/ui";
 import { Config, Status, getConfig, wakePc, statusPc } from "./api";
 
 export type State = "needs_setup" | "ready" | "checking" | "online" | "offline" | "waking" | "timed_out" | "error";
@@ -36,25 +37,26 @@ export function useWakeState() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const visible = useQuickAccessVisible();
+  useEffect(() => { if (visible) refresh(); }, [visible, refresh]);
 
   useEffect(() => () => { wakeCleanupRef.current?.(); }, []);
 
   useEffect(() => {
-    const interval = state === "waking" ? 2000 : 5000;
-    const id = setInterval(() => { refresh(); }, interval);
+    if (state !== "waking") return;
+    const id = setInterval(() => { refresh(); }, 2000);
     return () => clearInterval(id);
   }, [state, refresh]);
 
   useEffect(() => {
     if (wasWakingRef.current && state === "online") {
-      toaster.toast({ title: `${config?.alias ?? "PC"} is online`, body: "" });
+      toaster.toast({ title: "PC is online", body: "" });
     }
     if (wasWakingRef.current && state === "timed_out") {
       toaster.toast({ title: "No response after 2 min. Check power/WoL.", body: "" });
     }
     wasWakingRef.current = state === "waking";
-  }, [state, config]);
+  }, [state]);
 
   const wake = useCallback(async () => {
     if (Date.now() < rateUntil.current) return;
