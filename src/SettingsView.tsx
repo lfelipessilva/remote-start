@@ -14,6 +14,17 @@ const EDIT: Record<string, { title: string; charset: string; maxLength: number }
 
 const CSS = `.wake-pc-alias input { background: #16202d !important; color: #dcdedf !important; border: 1px solid #2a3f5a !important; border-radius: 4px !important; padding: 8px !important; }`;
 
+const derive24 = (ip: string) => {
+  const parts = (ip || "").split(".");
+  return parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.255` : "";
+};
+
+const isValidIp = (v: string) =>
+  /^\d{1,3}(\.\d{1,3}){3}$/.test(v) && v.split(".").every((p) => Number(p) <= 255);
+
+const humanError = (e: string) =>
+  e === "invalid ip" ? "Enter a valid IPv4 address, for example 192.168.1.42" : e;
+
 export function SettingsView({ onBack }: { onBack: () => void }) {
   const [form, setForm] = React.useState<Config>(EMPTY);
   const [msg, setMsg] = React.useState("");
@@ -24,38 +35,71 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [scanMsg, setScanMsg] = React.useState("");
   const [advanced, setAdvanced] = React.useState(false);
   const [editing, setEditing] = React.useState<keyof Config | null>(null);
+  const [editError, setEditError] = React.useState("");
+  const [ipError, setIpError] = React.useState("");
+  const [broadcastTouched, setBroadcastTouched] = React.useState(false);
 
   React.useEffect(() => {
     (async () => {
       const r: any = await getConfig();
       const cfg = r?.config ?? r;
-      if (cfg) setForm({ ...EMPTY, ...cfg });
+      if (cfg) {
+        setForm({ ...EMPTY, ...cfg });
+        setBroadcastTouched(!!cfg.broadcast && cfg.broadcast !== "255.255.255.255" && cfg.broadcast !== derive24(cfg.ip));
+      }
     })();
   }, []);
 
   const set = (k: keyof Config, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
-  const persist = async (next: Config) => {
+  const payload = (next: Config): Config => ({ ...next, broadcast: broadcastTouched ? next.broadcast : "" });
+
+  const persist = async (next: Config): Promise<boolean> => {
     setMsg("");
-    const r: any = await saveConfig(next);
-    if (r?.error) { setMsg(r.error); return; }
-    const cfg = r?.config ?? next;
-    setForm({ ...EMPTY, ...cfg });
-    if (cfg.mac) {
-      setMacMsg(`Found MAC ${cfg.mac}`);
-      setMsg("Saved");
-    } else {
-      setMacMsg("Saved. Turn the PC on once and save again so I can learn its MAC.");
+    setIpError("");
+    try {
+      const r: any = await saveConfig(payload(next));
+      if (r?.error) {
+        const m = humanError(r.error);
+        setMsg(m);
+        setIpError(m);
+        return false;
+      }
+      const cfg = r?.config ?? next;
+      setForm({ ...EMPTY, ...cfg });
+      if (cfg.mac) {
+        setMacMsg(`Found MAC ${cfg.mac}`);
+        setMsg("Saved");
+      } else {
+        setMacMsg("Saved. Turn the PC on once and save again so I can learn its MAC.");
+      }
+      return true;
+    } catch (e) {
+      const m = String(e);
+      setMsg(m);
+      setIpError(m);
+      return false;
     }
   };
 
   const confirmEdit = (value: string) => {
     if (!editing) return;
     const key = editing;
+    if (key === "ip") {
+      if (!isValidIp(value)) {
+        setEditError("Enter a valid IPv4 address, for example 192.168.1.42");
+        return;
+      }
+      setEditing(null);
+      setEditError("");
+      persist({ ...form, ip: value });
+      return;
+    }
     setEditing(null);
+    setEditError("");
+    if (key === "broadcast") setBroadcastTouched(true);
     const next: Config = { ...form, [key]: key === "probe_port" ? Number(value || 0) : value } as Config;
     setForm(next);
-    if (key === "ip") persist(next);
   };
 
   const scan = async () => {
@@ -112,7 +156,8 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
       initial: String((form as any)[editing] ?? ""),
       charset: spec.charset,
       maxLength: spec.maxLength,
-      onCancel: () => setEditing(null),
+      error: editError,
+      onCancel: () => { setEditing(null); setEditError(""); },
       onConfirm: confirmEdit,
     });
   }
@@ -143,6 +188,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     ),
 
     valueRow("PC address", form.ip, "ip", form.ip ? "Change" : "Enter IP"),
+    ipError ? React.createElement(PanelSectionRow, null,
+      React.createElement("div", { style: { color: "#ef4444", fontSize: 12 } }, ipError)
+    ) : null,
 
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: scan, disabled: scanning }, scanning ? "Scanning network…" : "Find on network")

@@ -42,9 +42,11 @@ async def test_wake_without_mac_returns_mac_unknown(monkeypatch):
         return None
 
     monkeypatch.setattr(main, "resolve_mac", none)
-    res = await wake(Config(ip="192.168.1.42", broadcast="192.168.1.255"))
+    with mock.patch("main.socket.socket") as sock:
+        res = await wake(Config(ip="192.168.1.42", broadcast="192.168.1.255"))
     assert res["error"] == "mac_unknown"
     assert "Turn the PC on once" in res["message"]
+    sock.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -61,3 +63,39 @@ async def test_save_ip_only_without_mac(tmp_path, monkeypatch):
     assert res["ok"] is True
     assert res["config"]["mac"] == ""
     assert res["mac_resolved"] is False
+
+
+@pytest.mark.asyncio
+async def test_test_wake_reports_mac_unknown(tmp_path, monkeypatch):
+    import main
+    monkeypatch.setenv("DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path))
+    main.SETTINGS_DIR = tmp_path
+
+    async def none(ip):
+        return None
+
+    monkeypatch.setattr(main, "resolve_mac", none)
+    main.save_config(main.Config(ip="192.168.1.42", broadcast="192.168.1.255"))
+    res = await main.Plugin().test_wake()
+    assert res["error"] == "mac_unknown"
+    assert "Turn the PC on once" in res["message"]
+
+
+@pytest.mark.asyncio
+async def test_ping_uses_short_deadline_and_kills_on_timeout(monkeypatch):
+    import main
+    fake = mock.MagicMock()
+    fake.wait = mock.AsyncMock()
+    fake.kill = mock.MagicMock()
+
+    async def boom(coro, timeout):
+        coro.close()
+        raise main.asyncio.TimeoutError()
+
+    with mock.patch("asyncio.create_subprocess_exec", mock.AsyncMock(return_value=fake)) as ex, \
+         mock.patch.object(main.asyncio, "wait_for", boom):
+        await main._ping_once("192.168.1.42")
+
+    args = ex.call_args[0]
+    assert args[0] == "ping" and args[3] == "-W" and args[4] == "1"
+    fake.kill.assert_called_once()

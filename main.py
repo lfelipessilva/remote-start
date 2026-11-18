@@ -278,15 +278,31 @@ def _find_mac_in_neigh(text: str, ip: str):
     return None
 
 
-async def resolve_mac(ip: str):
+async def _ping_once(ip: str) -> None:
     try:
         proc = await asyncio.create_subprocess_exec(
-            "ping", "-c", "1", "-W", "1000", ip,
+            "ping", "-c", "1", "-W", "1", ip,
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
         )
+    except Exception:
+        return
+    try:
         await asyncio.wait_for(proc.wait(), 2.0)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            await proc.wait()
+        except Exception:
+            pass
     except Exception:
         pass
+
+
+async def resolve_mac(ip: str):
+    await _ping_once(ip)
     try:
         if _ARP_PATH.exists():
             mac = _find_mac_in_arp(_ARP_PATH.read_text(errors="ignore"), ip)
@@ -429,6 +445,8 @@ class Plugin:
         try:
             cfg = load_config()
             res = await wake(cfg)
+            if res.get("error"):
+                return {"error": res["error"], "message": res.get("message")}
             return {"rounds": 1, "destinations": res.get("sent_to", []), "failed": res.get("failed", [])}
         except Exception as e:
             return {"error": str(e)}

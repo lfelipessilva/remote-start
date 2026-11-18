@@ -6,6 +6,7 @@ export interface KeypadSpec {
   initial: string;
   charset: string;
   maxLength: number;
+  error?: string;
   onCancel: () => void;
   onConfirm: (value: string) => void;
 }
@@ -30,6 +31,9 @@ export function KeypadModal(props: KeypadSpec) {
         },
       }, value || "\u2014")
     ),
+    props.error ? React.createElement(PanelSectionRow, null,
+      React.createElement("div", { style: { color: "#ef4444", fontSize: 12 } }, props.error)
+    ) : null,
     ...rows.map((row, i) => React.createElement(PanelSectionRow, { key: `row-${i}` },
       React.createElement(Focusable, { "flow-children": "row", style: { display: "flex", gap: 6 } } as any,
         ...row.map((c) => React.createElement(DialogButton, {

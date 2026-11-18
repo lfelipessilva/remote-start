@@ -77,5 +77,13 @@ def test_v1_config_migrates(tmp_path, monkeypatch):
     }))
     cfg = load_config()
     assert cfg.mac == "aa:bb:cc:dd:ee:ff"
+    assert cfg.broadcast == "255.255.255.255"
     assert cfg.probe_port == 445
     assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 2
+
+
+def test_empty_broadcast_derives_and_custom_broadcast_is_preserved():
+    cfg = validate_config({"ip": "192.168.1.42", "alias": "My PC", "mac": "", "broadcast": "", "probe_port": 0})
+    assert cfg.broadcast == "192.168.1.255"
+    cfg2 = validate_config({"ip": "192.168.1.42", "broadcast": "10.0.0.255"})
+    assert cfg2.broadcast == "10.0.0.255"
