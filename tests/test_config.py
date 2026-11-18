@@ -51,7 +51,7 @@ def test_schema_version_stored(tmp_path, monkeypatch):
     main.SETTINGS_DIR = tmp_path
     save_config(Config())
     data = json.loads((tmp_path/"config.json").read_text())
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
 
 
 def test_ip_only_config_derives_broadcast():
@@ -78,12 +78,35 @@ def test_v1_config_migrates(tmp_path, monkeypatch):
     cfg = load_config()
     assert cfg.mac == "aa:bb:cc:dd:ee:ff"
     assert cfg.broadcast == "255.255.255.255"
-    assert cfg.probe_port == 445
-    assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 2
+    assert not hasattr(cfg, "probe_port")
+    assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 3
+
+
+def test_v3_config_preserves_ssh_user(tmp_path, monkeypatch):
+    import main
+    monkeypatch.setenv("DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path))
+    main.SETTINGS_DIR = tmp_path
+    main.save_config(Config(ip="192.168.1.42", ssh_user="Luis"))
+    cfg = load_config()
+    assert cfg.ssh_user == "Luis"
+    assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 3
+
+
+def test_v2_config_migrates_to_v3(tmp_path, monkeypatch):
+    import main
+    monkeypatch.setenv("DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path))
+    main.SETTINGS_DIR = tmp_path
+    (tmp_path / "config.json").write_text(json.dumps({
+        "schema_version": 2, "alias": "My PC", "mac": "",
+        "ip": "192.168.1.42", "broadcast": "192.168.1.255",
+    }))
+    cfg = load_config()
+    assert cfg.ssh_user == ""
+    assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 3
 
 
 def test_empty_broadcast_derives_and_custom_broadcast_is_preserved():
-    cfg = validate_config({"ip": "192.168.1.42", "alias": "My PC", "mac": "", "broadcast": "", "probe_port": 0})
+    cfg = validate_config({"ip": "192.168.1.42", "alias": "My PC", "mac": "", "broadcast": ""})
     assert cfg.broadcast == "192.168.1.255"
     cfg2 = validate_config({"ip": "192.168.1.42", "broadcast": "10.0.0.255"})
     assert cfg2.broadcast == "10.0.0.255"

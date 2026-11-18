@@ -1,9 +1,10 @@
 import React from "react";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
-import { Config, Device, getConfig, saveConfig, testWake, testProbe, discover, learnMac } from "./api";
+import { Config, Device, getConfig, saveConfig, discover, learnMac, configureShutdown, resetShutdownSetup } from "./api";
 import { openFieldEditor, validateField } from "./FieldModal";
+import { openShutdownSetup } from "./ShutdownSetupModal";
 
-const EMPTY: Config = { alias: "My PC", mac: "", ip: "", broadcast: "", probe_port: 0 };
+const EMPTY: Config = { alias: "My PC", mac: "", ip: "", broadcast: "", ssh_user: "" };
 
 const derive24 = (ip: string) => {
   const parts = (ip || "").split(".");
@@ -19,7 +20,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [form, setForm] = React.useState<Config>(EMPTY);
   const [msg, setMsg] = React.useState("");
   const [macMsg, setMacMsg] = React.useState("");
-  const [testRes, setTestRes] = React.useState("");
+  const [shutdownMsg, setShutdownMsg] = React.useState("");
+  const [shutdownCommand, setShutdownCommand] = React.useState("");
+  const [shutdownBusy, setShutdownBusy] = React.useState(false);
   const [scanning, setScanning] = React.useState(false);
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [scanMsg, setScanMsg] = React.useState("");
@@ -72,14 +75,13 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
 
   const edit = (key: keyof Config) => {
     const value = String((form as any)[key] ?? "");
-    const title = key === "ip" ? "PC IP address" : key === "mac" ? "MAC address" : key === "broadcast" ? "Broadcast address" : "Probe port";
-    const label = key === "ip" ? "IPv4 address" : key === "mac" ? "MAC" : key === "broadcast" ? "Broadcast" : "TCP port";
-    const kind = key === "probe_port" ? "port" : (key as "ip" | "mac" | "broadcast");
+    const title = key === "ip" ? "PC IP address" : key === "mac" ? "MAC address" : "Broadcast address";
+    const label = key === "ip" ? "IPv4 address" : key === "mac" ? "MAC" : "Broadcast";
+    const kind = key as "ip" | "mac" | "broadcast";
     const hint =
       key === "ip" ? "The PC's LAN address, for example 192.168.1.42"
       : key === "mac" ? "Learned automatically. Leave empty to learn it again."
-      : key === "broadcast" ? "Leave empty to derive it from the PC address."
-      : "Optional. Leave empty to use ping and ARP only.";
+      : "Leave empty to derive it from the PC address.";
 
     openFieldEditor({
       title,
@@ -90,10 +92,7 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
       onConfirm: (v) => {
         if (validateField(v, kind)) return;
         if (key === "broadcast") setBroadcastTouched(true);
-        const next: Config = {
-          ...form,
-          [key]: key === "probe_port" ? (v ? Number(v) : 0) : v,
-        } as Config;
+        const next: Config = { ...form, [key]: v } as Config;
         setForm(next);
         if (key === "ip") persist(next);
       },
@@ -119,7 +118,7 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
 
   const pick = (d: Device) => {
     setForm((f) => ({ ...f, ip: d.ip, mac: d.mac }));
-    setScanMsg(`Using ${d.ip}`);
+    setScanMsg(d.name ? `Using ${d.name} (${d.ip})` : `Using ${d.ip}`);
     setDevices([]);
     setMacMsg(`Found MAC ${d.mac}`);
   };
@@ -139,23 +138,50 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const doTestWake = async () => {
+  const setupShutdown = () => {
+    openShutdownSetup(form.ssh_user, async (user, password) => {
+      setShutdownBusy(true);
+      setShutdownMsg("Connecting to the PC…");
+      setShutdownCommand("");
+      try {
+        const r: any = await configureShutdown(user, password);
+        if (r?.error) {
+          setShutdownMsg(r.message ?? r.error);
+          if (r.command) setShutdownCommand(r.command);
+          return;
+        }
+        setForm((f) => ({ ...f, ssh_user: r.user ?? user }));
+        setShutdownMsg("Shutdown configured. The password was not saved.");
+      } catch (e) {
+        setShutdownMsg(String(e));
+      } finally {
+        setShutdownBusy(false);
+      }
+    });
+  };
+
+  const resetShutdown = async () => {
+    setShutdownBusy(true);
+    setShutdownMsg("Resetting shutdown setup…");
+    setShutdownCommand("");
     try {
-      const r: any = await testWake();
-      if (r?.error) { setTestRes(r.message ?? r.error); return; }
-      setTestRes(`Test packet sent to ${JSON.stringify(r.destinations ?? r.sent_to ?? [])}`);
+      const r: any = await resetShutdownSetup();
+      if (r?.error) { setShutdownMsg(r.error); return; }
+      setForm((f) => ({ ...f, ssh_user: "" }));
+      setShutdownMsg("Shutdown setup reset.");
     } catch (e) {
-      setTestRes(String(e));
+      setShutdownMsg(String(e));
+    } finally {
+      setShutdownBusy(false);
     }
   };
 
-  const doTestProbe = async () => {
+  const copyShutdownCommand = async () => {
     try {
-      const r: any = await testProbe();
-      if (r?.error) { setTestRes(r.error); return; }
-      setTestRes(`Probe: ${r.online ? "online" : "offline"} via ${r.method}${r.latency_ms != null ? ` (${r.latency_ms} ms)` : ""}`);
-    } catch (e) {
-      setTestRes(String(e));
+      await navigator.clipboard.writeText(shutdownCommand);
+      setShutdownMsg("Setup command copied.");
+    } catch {
+      setShutdownMsg("Could not copy the command.");
     }
   };
 
@@ -183,7 +209,8 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     ) : null,
     ...devices.map((d) =>
       React.createElement(PanelSectionRow, { key: d.ip },
-        React.createElement(ButtonItem, { layout: "below", onClick: () => pick(d) }, `${d.ip}   ·   ${d.mac}`)
+        React.createElement(ButtonItem, { layout: "below", onClick: () => pick(d) },
+          `${d.name ? `${d.name}   ·   ` : ""}${d.ip}   ·   ${d.mac}`)
       )
     ),
 
@@ -205,20 +232,42 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     ),
 
     React.createElement(PanelSectionRow, null,
+      React.createElement("div", { style: { fontWeight: 600, marginTop: 8 } }, "Shutdown")
+    ),
+    React.createElement(PanelSectionRow, null,
+      React.createElement(ButtonItem, {
+        layout: "below",
+        onClick: setupShutdown,
+        disabled: shutdownBusy || !form.ip,
+      }, form.ssh_user ? `Reconfigure shutdown (${form.ssh_user})` : "Configure shutdown")
+    ),
+    React.createElement(PanelSectionRow, null,
+      React.createElement("div", { style: { fontSize: 11, opacity: 0.7 } },
+        "Requires OpenSSH Server on the PC. Your Windows password is used once and not saved."
+      )
+    ),
+    shutdownMsg ? React.createElement(PanelSectionRow, null,
+      React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: /configured|reset|copied/i.test(shutdownMsg) ? "#22c55e" : "#ef4444",
+        },
+      }, shutdownMsg)
+    ) : null,
+    shutdownCommand ? React.createElement(PanelSectionRow, null,
+      React.createElement(ButtonItem, { layout: "below", onClick: copyShutdownCommand }, "Copy setup command")
+    ) : null,
+    form.ssh_user ? React.createElement(PanelSectionRow, null,
+      React.createElement(ButtonItem, { layout: "below", onClick: resetShutdown, disabled: shutdownBusy }, "Reset shutdown setup")
+    ) : null,
+
+    React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: () => setAdvanced(!advanced) }, `${advanced ? "▾" : "▸"} Advanced`)
     ),
     advanced ? field("MAC address", form.mac, "mac", form.mac ? "Change MAC" : "Enter MAC") : null,
     advanced ? field("Broadcast", form.broadcast, "broadcast", form.broadcast ? "Change broadcast" : "Enter broadcast") : null,
-    advanced ? field("Probe port", String(form.probe_port || ""), "probe_port", form.probe_port ? "Change port" : "Enter port") : null,
 
-    React.createElement(PanelSectionRow, null,
-      React.createElement(ButtonItem, { layout: "below", onClick: doTestWake }, "Send test packet")
-    ),
-    React.createElement(PanelSectionRow, null,
-      React.createElement(ButtonItem, { layout: "below", onClick: doTestProbe }, "Test status probe")
-    ),
     msg ? React.createElement(PanelSectionRow, null, React.createElement("div", { style: { color: msg === "Saved" ? "#22c55e" : "#ef4444", fontSize: 12 } }, msg)) : null,
-    testRes ? React.createElement(PanelSectionRow, null, React.createElement("div", { style: { fontSize: 12, opacity: 0.85 } }, testRes)) : null,
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: () => onBack() }, "Back")
     )

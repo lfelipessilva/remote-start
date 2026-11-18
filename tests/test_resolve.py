@@ -66,7 +66,7 @@ async def test_save_ip_only_without_mac(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_test_wake_reports_mac_unknown(tmp_path, monkeypatch):
+async def test_wake_reports_mac_unknown(tmp_path, monkeypatch):
     import main
     monkeypatch.setenv("DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path))
     main.SETTINGS_DIR = tmp_path
@@ -76,7 +76,7 @@ async def test_test_wake_reports_mac_unknown(tmp_path, monkeypatch):
 
     monkeypatch.setattr(main, "resolve_mac", none)
     main.save_config(main.Config(ip="192.168.1.42", broadcast="192.168.1.255"))
-    res = await main.Plugin().test_wake()
+    res = await main.Plugin().wake()
     assert res["error"] == "mac_unknown"
     assert "Turn the PC on once" in res["message"]
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { ConfirmModal, TextField, showModal } from "@decky/ui";
 
-export type FieldKind = "ip" | "mac" | "broadcast" | "port";
+export type FieldKind = "ip" | "mac" | "broadcast";
 
 interface FieldSpec {
   title: string;
@@ -16,10 +16,7 @@ const sanitize = (raw: string, kind: FieldKind): string => {
   if (kind === "ip" || kind === "broadcast") {
     return raw.replace(/[^0-9.]/g, "").slice(0, 15);
   }
-  if (kind === "mac") {
-    return raw.replace(/[^0-9a-fA-F:.-]/g, "").slice(0, 17);
-  }
-  return raw.replace(/[^0-9]/g, "").slice(0, 5);
+  return raw.replace(/[^0-9a-fA-F:.-]/g, "").slice(0, 17);
 };
 
 const validIpv4 = (v: string): boolean => {
@@ -41,9 +38,6 @@ export const validateField = (value: string, kind: FieldKind): string => {
       return /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$|^[0-9a-fA-F]{12}$/.test(v)
         ? ""
         : "Enter 12 hex digits, for example AA:BB:CC:DD:EE:FF";
-    case "port":
-      if (!v) return "";
-      return Number(v) >= 1 && Number(v) <= 65535 ? "" : "Enter a port between 1 and 65535.";
     default:
       return "";
   }
@@ -76,7 +70,6 @@ function FieldDialog(spec: FieldSpec & { close: () => void }) {
       value,
       focusOnMount: true,
       bShowClearAction: true,
-      mustBeNumeric: spec.kind === "port",
       onChange: (e: any) => setValue(sanitize(e.target.value, spec.kind)),
     })
   );
