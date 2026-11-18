@@ -1,11 +1,11 @@
 {
-  "name": "wake-pc",
-  "version": "0.1.2",
+  "name": "remote-start",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
-    "package": "pnpm build && rm -rf .pkg wake-pc.zip && mkdir -p .pkg/wake-pc && cp plugin.json main.py package.json README.md LICENSE .pkg/wake-pc/ && cp -r dist backend .pkg/wake-pc/ && cd .pkg && zip -r -q ../wake-pc.zip wake-pc && cd .. && rm -rf .pkg"
+    "package": "pnpm build && rm -rf .pkg remote-start.zip && mkdir -p '.pkg/Remote Start' && cp plugin.json main.py package.json README.md LICENSE '.pkg/Remote Start/' && cp -r dist backend '.pkg/Remote Start/' && find '.pkg/Remote Start' -name __pycache__ -type d -prune -exec rm -rf {} + && find '.pkg/Remote Start' -name '*.pyc' -delete && cd .pkg && zip -r -q '../remote-start.zip' 'Remote Start' && cd .. && rm -rf .pkg"
   },
   "dependencies": {
     "@decky/api": "latest",

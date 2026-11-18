@@ -1,15 +1,29 @@
-# Wake PC
+# Remote Start
 
 A Decky Loader plugin that turns your PC on from the Steam Deck's Quick Access
 Menu using Wake-on-LAN, shows whether the PC is currently on, and can shut it
 down again over SSH.
 
+| | |
+|---|---|
+| **Name** | Remote Start |
+| **Plugin ID** | `Remote Start` |
+| **Version** | 0.1.3 |
+| **Author** | Luis Felipe |
+| **Decky API** | 1 |
+| **Requires** | Decky Loader, Steam Deck (SteamOS) |
+| **Network** | Wake-on-LAN magic packet, ping/ARP for status, optional SSH for shutdown |
+
+> **Download:** [Latest release](https://github.com/lfelipessilva/remote-start/releases/latest) ·
+> [`remote-start.zip`](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)
+> — see [Install / update](#install--update).
+
 ## Quick start (3 steps)
 
 1. **Turn the PC on once** (the plugin learns its MAC from the network; a
    switched-off PC is invisible).
-2. QAM → **Wake PC** → **Settings** → **Enter IP address** (the Steam keyboard
-   opens) or **Find on network**, then tap your PC. Save.
+2. QAM → **Remote Start** → **Settings** → **Enter IP address** (the Steam
+   keyboard opens) or **Find on network**, then tap your PC. Save.
 3. **Press Wake.** Watch the dot: Offline → Waking → Online.
 
 Optional: enable OpenSSH Server on the PC and use **Settings → Configure
@@ -143,7 +157,7 @@ with `ssh -p 22 <user>@<pc-ip>` (password prompt means it works).
 ### 2. Configure it in the plugin
 
 1. PC on, same network as the Deck.
-2. QAM → **Wake PC** → **Settings** → **Configure shutdown**.
+2. QAM → **Remote Start** → **Settings** → **Configure shutdown**.
 3. **Windows username** — run `whoami` on the PC and copy the result, for
    example `desktop-pc\luis`. For a Microsoft account, use the local profile
    name shown by `whoami` and the Microsoft account password.
@@ -214,34 +228,65 @@ PC, and skip it if the PC holds sensitive data.
 
 ## Install / update
 
-Build the zip:
+[![Latest release](https://img.shields.io/github/v/release/lfelipessilva/remote-start)](https://github.com/lfelipessilva/remote-start/releases/latest)
+[![Download remote-start.zip](https://img.shields.io/badge/download-remote--start.zip-38bdf8)](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)
+
+1. **Download the latest `remote-start.zip`** from the
+   [Releases page](https://github.com/lfelipessilva/remote-start/releases/latest)
+   (direct link:
+   [`remote-start.zip`](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)).
+   Do this in Desktop Mode on the Deck, or transfer the file with `scp`.
+2. In Decky Loader, open **Decky → Developer → Install Plugin from ZIP File**
+   and select the downloaded `remote-start.zip`. If the Developer section is
+   hidden, enable **Developer Mode** in Decky's settings first.
+3. Restart Decky when prompted (or run `sudo systemctl restart plugin_loader`).
+4. Open the Quick Access Menu → **Remote Start**.
+
+To **update**, download the newest release and install it the same way. Your
+settings and the shutdown SSH key are kept.
+
+### Install from the command line (optional)
 
 ```sh
-pnpm install
-pnpm package      # produces wake-pc.zip
-```
-
-The zip must contain one top-level folder named `wake-pc/`. `pnpm package`
-handles that.
-
-Install on the Deck:
-
-```sh
-scp wake-pc.zip deck@<deck-ip>:/home/deck/
+scp remote-start.zip deck@<deck-ip>:/home/deck/
 ssh deck@<deck-ip>
-unzip -o /home/deck/wake-pc.zip -d /tmp/wake-pc-install
-sudo rm -rf /home/deck/homebrew/plugins/wake-pc
-sudo cp -r /tmp/wake-pc-install/wake-pc /home/deck/homebrew/plugins/wake-pc
+unzip -o /home/deck/remote-start.zip -d /tmp/remote-start-install
+sudo rm -rf "/home/deck/homebrew/plugins/Remote Start" "/home/deck/homebrew/plugins/remote-start.zip"
+sudo cp -r "/tmp/remote-start-install/Remote Start" "/home/deck/homebrew/plugins/Remote Start"
 sudo systemctl restart plugin_loader
 ```
 
-Or use Decky → Developer → *Install Plugin from ZIP File*.
+> **Upgrading from the old "Wake PC" build:** the plugin was renamed, so the
+> plugin folder and settings folder changed. Remove the old
+> `homebrew/plugins/remote-start` folder (the command above does it), then open
+> **Remote Start → Settings** and enter the PC IP once. The old config and
+> shutdown key in `homebrew/settings/remote-start` are not reused and can be deleted.
+
+### Build from source
+
+```sh
+pnpm install
+pnpm package      # produces remote-start.zip
+```
+
+The zip contains one top-level folder named `Remote Start/`.
+
+To publish a release (which uploads `remote-start.zip`), bump the version in
+`plugin.json` and `package.json`, then push a matching tag:
+
+```sh
+git tag v0.1.3
+git push origin v0.1.3
+```
+
+The workflow `.github/workflows/release.yml` builds the zip and attaches
+`remote-start.zip` to the GitHub release.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| Plugin does not appear in Decky | Zip had no `wake-pc/` top-level folder, or the file name did not match. Rebuild with `pnpm package` and reinstall. |
+| Plugin does not appear in Decky | Download the latest `remote-start.zip` from the [Releases page](https://github.com/lfelipessilva/remote-start/releases/latest) and install it again. If building yourself, the zip must contain a `Remote Start/` top-level folder. |
 | `manifest is not defined` / `React is not defined` | Old build. Rebuild and reinstall; the current build uses `@decky/rollup`. |
 | Wake sent but PC stays off | Check WoL in BIOS and NIC; disable Fast Startup; confirm same subnet. |
 | Wake says "MAC address unknown" | Turn the PC on (same network) and press **Save** or **Retry learning MAC**. The MAC must be learned while the PC is visible. |

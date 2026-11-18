@@ -1,3 +1,13 @@
+import os
+import sys
+
+# Decky loads main.py with spec_from_file_location and only adds `py_modules`
+# to sys.path, so sibling packages like `backend` are not importable by
+# default. Make the plugin directory importable before importing them.
+_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+if _PLUGIN_DIR not in sys.path:
+    sys.path.insert(0, _PLUGIN_DIR)
+
 from backend.src.config import *
 from backend.src.network import *
 from backend.src.shutdown import *
@@ -100,7 +110,3 @@ class Plugin:
             return {"error": str(e)}
 
 plugin = Plugin()
-try:
-    decky.run(plugin) if hasattr(decky, "run") else None
-except NameError:
-    pass

@@ -1,11 +1,11 @@
 {
-  "name": "wake-pc",
+  "name": "Remote Start",
   "author": "Luis Felipe",
   "flags": [],
   "publish": {
     "tags": [],
-    "description": "Wake a PC from the Quick Access Menu"
+    "description": "Wake, check, and shut down a PC from the Quick Access Menu"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "api_version": 1
 }

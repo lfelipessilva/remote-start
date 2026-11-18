@@ -3,6 +3,7 @@ import { definePlugin, toaster } from "@decky/api";
 import { PanelSection, PanelSectionRow, ButtonItem, ConfirmModal, staticClasses, showModal } from "@decky/ui";
 import { useWakeState, State } from "./useWakeState";
 import { SettingsView } from "./SettingsView";
+import { RemoteStartIcon } from "./Icon";
 import { shutdownPc } from "./api";
 
 const DOT: Record<State, string> = {
@@ -81,7 +82,7 @@ function Panel() {
     }
   };
 
-  return React.createElement(PanelSection, { title: "Wake PC" },
+  return React.createElement(PanelSection, { title: "Remote Start" },
     React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "2px 0" } },
         React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }),
@@ -117,9 +118,9 @@ function Panel() {
 }
 
 export default definePlugin(() => ({
-  name: "Wake PC",
-  title: React.createElement("div", { className: staticClasses.Title }, "Wake PC"),
+  name: "Remote Start",
+  title: React.createElement("div", { className: staticClasses.Title }, "Remote Start"),
   content: React.createElement(Panel),
-  icon: React.createElement("div", null),
+  icon: React.createElement(RemoteStartIcon),
   onDismount() {},
 }));

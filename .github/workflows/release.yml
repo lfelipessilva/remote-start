@@ -23,4 +23,4 @@ jobs:
       - run: pnpm package
       - uses: softprops/action-gh-release@v2
         with:
-          files: wake-pc.zip
+          files: remote-start.zip

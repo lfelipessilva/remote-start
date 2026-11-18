@@ -50,7 +50,7 @@ async def ensure_shutdown_key():
             except FileNotFoundError:
                 pass
         proc = await asyncio.create_subprocess_exec(
-            "ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "decky-wake-pc",
+            "ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "decky-remote-start",
             "-f", str(key),
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
         )
