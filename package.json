@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "rollup -c",
-    "watch": "rollup -c -w"
+    "watch": "rollup -c -w",
+    "package": "pnpm build && rm -f wake-pc.zip && zip -r -q wake-pc.zip plugin.json main.py package.json dist README.md"
   },
   "dependencies": {
     "@decky/api": "latest",
