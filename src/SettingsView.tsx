@@ -1,29 +1,19 @@
 import React from "react";
-import { PanelSection, PanelSectionRow, ButtonItem, TextField } from "@decky/ui";
+import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
 import { Config, Device, getConfig, saveConfig, testWake, testProbe, discover, learnMac } from "./api";
-import { KeypadModal } from "./KeypadModal";
+import { openFieldEditor, validateField } from "./FieldModal";
 
 const EMPTY: Config = { alias: "My PC", mac: "", ip: "", broadcast: "", probe_port: 0 };
-
-const EDIT: Record<string, { title: string; charset: string; maxLength: number }> = {
-  ip: { title: "PC IP", charset: "0123456789.", maxLength: 15 },
-  mac: { title: "MAC address", charset: "0123456789abcdef:", maxLength: 17 },
-  broadcast: { title: "Broadcast", charset: "0123456789.", maxLength: 15 },
-  probe_port: { title: "Probe port", charset: "0123456789", maxLength: 5 },
-};
-
-const CSS = `.wake-pc-alias input { background: #16202d !important; color: #dcdedf !important; border: 1px solid #2a3f5a !important; border-radius: 4px !important; padding: 8px !important; }`;
 
 const derive24 = (ip: string) => {
   const parts = (ip || "").split(".");
   return parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.255` : "";
 };
 
-const isValidIp = (v: string) =>
-  /^\d{1,3}(\.\d{1,3}){3}$/.test(v) && v.split(".").every((p) => Number(p) <= 255);
-
 const humanError = (e: string) =>
-  e === "invalid ip" ? "Enter a valid IPv4 address, for example 192.168.1.42" : e;
+  e === "invalid ip" ? "Enter a valid IPv4 address, for example 192.168.1.42"
+  : e === "invalid mac" ? "Enter 12 hex digits, for example AA:BB:CC:DD:EE:FF"
+  : e;
 
 export function SettingsView({ onBack }: { onBack: () => void }) {
   const [form, setForm] = React.useState<Config>(EMPTY);
@@ -34,8 +24,6 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [scanMsg, setScanMsg] = React.useState("");
   const [advanced, setAdvanced] = React.useState(false);
-  const [editing, setEditing] = React.useState<keyof Config | null>(null);
-  const [editError, setEditError] = React.useState("");
   const [ipError, setIpError] = React.useState("");
   const [broadcastTouched, setBroadcastTouched] = React.useState(false);
 
@@ -82,24 +70,35 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const confirmEdit = (value: string) => {
-    if (!editing) return;
-    const key = editing;
-    if (key === "ip") {
-      if (!isValidIp(value)) {
-        setEditError("Enter a valid IPv4 address, for example 192.168.1.42");
-        return;
-      }
-      setEditing(null);
-      setEditError("");
-      persist({ ...form, ip: value });
-      return;
-    }
-    setEditing(null);
-    setEditError("");
-    if (key === "broadcast") setBroadcastTouched(true);
-    const next: Config = { ...form, [key]: key === "probe_port" ? Number(value || 0) : value } as Config;
-    setForm(next);
+  const edit = (key: keyof Config) => {
+    const value = String((form as any)[key] ?? "");
+    const title = key === "ip" ? "PC IP address" : key === "mac" ? "MAC address" : key === "broadcast" ? "Broadcast address" : key === "probe_port" ? "Probe port" : "PC name";
+    const label = key === "alias" ? "Name" : key === "ip" ? "IPv4 address" : key === "mac" ? "MAC" : key === "broadcast" ? "Broadcast" : "TCP port";
+    const kind = key === "probe_port" ? "port" : key === "alias" ? "alias" : (key as "ip" | "mac" | "broadcast");
+    const hint =
+      key === "ip" ? "The PC's LAN address, for example 192.168.1.42"
+      : key === "mac" ? "Learned automatically. Leave empty to learn it again."
+      : key === "broadcast" ? "Leave empty to derive it from the PC address."
+      : key === "probe_port" ? "Optional. Leave empty to use ping only."
+      : "Name shown in the panel (optional)";
+
+    openFieldEditor({
+      title,
+      label,
+      hint,
+      kind,
+      initial: value,
+      onConfirm: (v) => {
+        if (validateField(v, kind)) return;
+        if (key === "broadcast") setBroadcastTouched(true);
+        const next: Config = {
+          ...form,
+          [key]: key === "probe_port" ? (v ? Number(v) : 0) : v,
+        } as Config;
+        setForm(next);
+        if (key === "ip") persist(next);
+      },
+    });
   };
 
   const scan = async () => {
@@ -127,67 +126,54 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   };
 
   const retryMac = async () => {
-    const r: any = await learnMac();
-    if (r?.error) { setMacMsg(r.error); return; }
-    if (r?.mac) {
-      setForm((f) => ({ ...f, mac: r.mac }));
-      setMacMsg(`Found MAC ${r.mac}`);
-    } else {
-      setMacMsg("Still no MAC. Turn the PC on (same network) and try again.");
+    try {
+      const r: any = await learnMac();
+      if (r?.error) { setMacMsg(r.error); return; }
+      if (r?.mac) {
+        setForm((f) => ({ ...f, mac: r.mac }));
+        setMacMsg(`Found MAC ${r.mac}`);
+      } else {
+        setMacMsg("Still no MAC. Turn the PC on (same network) and try again.");
+      }
+    } catch (e) {
+      setMacMsg(String(e));
     }
   };
 
   const doTestWake = async () => {
-    const r: any = await testWake();
-    if (r?.error) { setTestRes(r.message ?? r.error); return; }
-    setTestRes(`Test packet sent to ${JSON.stringify(r.destinations ?? r.sent_to ?? [])}`);
+    try {
+      const r: any = await testWake();
+      if (r?.error) { setTestRes(r.message ?? r.error); return; }
+      setTestRes(`Test packet sent to ${JSON.stringify(r.destinations ?? r.sent_to ?? [])}`);
+    } catch (e) {
+      setTestRes(String(e));
+    }
   };
 
   const doTestProbe = async () => {
-    const r: any = await testProbe();
-    if (r?.error) { setTestRes(r.error); return; }
-    setTestRes(`Probe: ${r.online ? "online" : "offline"} via ${r.method}${r.latency_ms != null ? ` (${r.latency_ms} ms)` : ""}`);
+    try {
+      const r: any = await testProbe();
+      if (r?.error) { setTestRes(r.error); return; }
+      setTestRes(`Probe: ${r.online ? "online" : "offline"} via ${r.method}${r.latency_ms != null ? ` (${r.latency_ms} ms)` : ""}`);
+    } catch (e) {
+      setTestRes(String(e));
+    }
   };
 
-  if (editing) {
-    const spec = EDIT[editing];
-    return React.createElement(KeypadModal, {
-      title: spec.title,
-      initial: String((form as any)[editing] ?? ""),
-      charset: spec.charset,
-      maxLength: spec.maxLength,
-      error: editError,
-      onCancel: () => { setEditing(null); setEditError(""); },
-      onConfirm: confirmEdit,
-    });
-  }
-
-  const valueRow = (label: string, value: string, key: keyof Config, action: string) =>
+  const field = (label: string, value: string, key: keyof Config, action: string) =>
     React.createElement(PanelSectionRow, null,
-      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-          React.createElement("div", { style: { fontSize: 12, opacity: 0.65 } }, label),
-          React.createElement("div", { style: { fontFamily: "monospace", wordBreak: "break-all" } }, value || "Not set")
-        ),
-        React.createElement(ButtonItem, { onClick: () => setEditing(key) }, action)
-      )
+      React.createElement(ButtonItem, {
+        layout: "below",
+        label,
+        description: value || "Not set",
+        onClick: () => edit(key),
+      }, action)
     );
 
   return React.createElement(PanelSection, { title: "Settings" },
-    React.createElement("style", null, CSS),
+    field("PC name", form.alias, "alias", "Change name"),
 
-    React.createElement(PanelSectionRow, null,
-      React.createElement("div", { className: "wake-pc-alias" },
-        React.createElement(TextField, {
-          label: "Alias",
-          description: "Name shown in the panel (optional)",
-          value: form.alias,
-          onChange: (e: any) => set("alias", e.target.value),
-        })
-      )
-    ),
-
-    valueRow("PC address", form.ip, "ip", form.ip ? "Change" : "Enter IP"),
+    field("PC address", form.ip, "ip", form.ip ? "Change IP address" : "Enter IP address"),
     ipError ? React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { color: "#ef4444", fontSize: 12 } }, ipError)
     ) : null,
@@ -224,9 +210,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: () => setAdvanced(!advanced) }, `${advanced ? "▾" : "▸"} Advanced`)
     ),
-    advanced ? valueRow("MAC address", form.mac, "mac", form.mac ? "Change" : "Enter") : null,
-    advanced ? valueRow("Broadcast", form.broadcast, "broadcast", form.broadcast ? "Change" : "Enter") : null,
-    advanced ? valueRow("Probe port", String(form.probe_port || ""), "probe_port", form.probe_port ? "Change" : "Enter") : null,
+    advanced ? field("MAC address", form.mac, "mac", form.mac ? "Change MAC" : "Enter MAC") : null,
+    advanced ? field("Broadcast", form.broadcast, "broadcast", form.broadcast ? "Change broadcast" : "Enter broadcast") : null,
+    advanced ? field("Probe port", String(form.probe_port || ""), "probe_port", form.probe_port ? "Change port" : "Enter port") : null,
 
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: doTestWake }, "Send test packet")

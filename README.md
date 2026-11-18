@@ -7,8 +7,8 @@ Menu using Wake-on-LAN, and shows whether the PC is currently on.
 
 1. **Turn the PC on once** (the plugin learns its MAC from the network; a
    switched-off PC is invisible).
-2. QAM → **Wake PC** → **Settings** → **Enter IP** (gamepad keypad) or **Find on
-   network**, then tap your PC. Save.
+2. QAM → **Wake PC** → **Settings** → **Enter IP address** (the Steam keyboard
+   opens) or **Find on network**, then tap your PC. Save.
 3. **Press Wake.** Watch the dot: Offline → Waking → Online.
 
 Only the PC's IP is required. The plugin looks the MAC up in the Deck's ARP table
@@ -61,10 +61,11 @@ to be on so its MAC can be learned.
 - **Wake** — sends the magic packet and watches for the PC to answer for up to
   2 minutes. Disabled while the PC is already online or during an attempt.
 - **Refresh** — re-checks the status right now.
-- **Settings** — enter the PC IP with the gamepad keypad, or tap **Find on
-  network**. No Steam on-screen keyboard is used. **Advanced** exposes MAC,
-  broadcast and probe port if you ever need them.
-- **Enter IP** — gamepad keypad for the address; OK saves immediately.
+- **Settings** — enter the PC IP with the Steam on-screen keyboard, or tap
+  **Find on network**. **Advanced** exposes MAC, broadcast and probe port if you
+  ever need them.
+- **Enter IP address** — opens a small dialog; type with the Steam keyboard and
+  press **Save** (saves immediately).
 - **Find on network** (in Settings) — scans the subnet and lists devices that
   are currently on; tap one to use its IP and MAC automatically.
 - **Retry learning MAC** — shown while no MAC is known; run it with the PC on.
