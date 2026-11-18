@@ -27,4 +27,5 @@ export const preflightPc = callable<[], any>("preflight");
 export const testWake = callable<[], any>("test_wake");
 export const testProbe = callable<[], any>("test_probe");
 export const discover = callable<[], any>("discover");
+export const learnMac = callable<[], any>("learn_mac");
 export const getDiagnostics = callable<[], any>("get_diagnostics");

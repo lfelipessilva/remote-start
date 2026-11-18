@@ -16,7 +16,7 @@ const LABEL: Record<State, string> = {
 };
 
 const HINT: Partial<Record<State, string>> = {
-  needs_setup: "Open Settings and enter the PC's MAC and IP (or use Discover).",
+  needs_setup: "Open Settings and enter the PC's IP.",
   offline: "No answer. If the PC is on, set a Probe port or allow ping through its firewall.",
   timed_out: "The packet was sent but the PC never answered. Check WoL and Fast Startup.",
   error: "Something failed. Open Diagnostics for details.",

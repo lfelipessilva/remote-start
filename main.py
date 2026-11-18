@@ -216,7 +216,7 @@ async def status(cfg: Config) -> dict:
 def preflight(cfg: Config, deck_ip) -> list:
     problems = []
     if not cfg.mac:
-        problems.append("missing MAC address")
+        problems.append("MAC not learned yet — turn the PC on once or use Discover")
     if not cfg.ip:
         problems.append("missing IP address")
     # broadcast validity

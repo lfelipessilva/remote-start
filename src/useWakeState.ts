@@ -20,7 +20,7 @@ export function useWakeState() {
       const r: any = await getConfig();
       const cfg = (r?.config ?? r) as Config;
       setConfig(cfg);
-      if (!cfg || !cfg.mac) { setState("needs_setup"); return; }
+      if (!cfg || !cfg.ip) { setState("needs_setup"); return; }
       if (!wakingRef.current) setState("checking");
       const st: any = await statusPc();
       setStatus(st);
@@ -68,7 +68,13 @@ export function useWakeState() {
     }, 120000);
     wakeCleanupRef.current = () => clearTimeout(timeoutId);
     try {
-      await wakePc();
+      const res: any = await wakePc();
+      if (res?.error) {
+        wakingRef.current = false;
+        clearTimeout(timeoutId);
+        setState("error");
+        toaster.toast({ title: res.message ?? res.error, body: "" });
+      }
     } catch (e) {
       wakingRef.current = false;
       clearTimeout(timeoutId);
