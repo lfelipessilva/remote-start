@@ -3,7 +3,7 @@ import base64
 import tempfile
 import asyncio
 from pathlib import Path
-from config import load_config, save_config
+from .config import load_config, save_config
 
 def _settings_dir():
     try:
@@ -12,7 +12,7 @@ def _settings_dir():
             return main.SETTINGS_DIR
     except Exception:
         pass
-    from config import SETTINGS_DIR
+    from .config import SETTINGS_DIR
     return SETTINGS_DIR
 def _ssh_key_path() -> Path:
     return _settings_dir() / "shutdown_key"

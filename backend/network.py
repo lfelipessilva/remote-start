@@ -7,7 +7,7 @@ import base64
 import tempfile
 import time
 from pathlib import Path
-from config import (Config, normalize_mac, _validate_ip, validate_config, derive_subnet_broadcast, SETTINGS_DIR)
+from .config import (Config, normalize_mac, _validate_ip, validate_config, derive_subnet_broadcast, SETTINGS_DIR)
 
 _ARP_PATH = Path("/proc/net/arp")
 
