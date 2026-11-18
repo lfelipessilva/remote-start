@@ -51,4 +51,31 @@ def test_schema_version_stored(tmp_path, monkeypatch):
     main.SETTINGS_DIR = tmp_path
     save_config(Config())
     data = json.loads((tmp_path/"config.json").read_text())
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
+
+
+def test_ip_only_config_derives_broadcast():
+    cfg = validate_config({"ip": "192.168.1.42"})
+    assert cfg.mac == ""
+    assert cfg.broadcast == "192.168.1.255"
+    assert cfg.alias == "My PC"
+
+
+def test_ip_required():
+    with pytest.raises(ValueError):
+        validate_config({"alias": "x"})
+
+
+def test_v1_config_migrates(tmp_path, monkeypatch):
+    import main
+    monkeypatch.setenv("DECKY_PLUGIN_SETTINGS_DIR", str(tmp_path))
+    main.SETTINGS_DIR = tmp_path
+    (tmp_path / "config.json").write_text(json.dumps({
+        "schema_version": 1, "alias": "Gaming PC",
+        "mac": "aa:bb:cc:dd:ee:ff", "ip": "192.168.1.42",
+        "broadcast": "255.255.255.255", "probe_port": 445,
+    }))
+    cfg = load_config()
+    assert cfg.mac == "aa:bb:cc:dd:ee:ff"
+    assert cfg.probe_port == 445
+    assert json.loads((tmp_path / "config.json").read_text())["schema_version"] == 2

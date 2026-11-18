@@ -15,7 +15,8 @@ try:
 except Exception:
     SETTINGS_DIR = Path(os.environ.get("DECKY_PLUGIN_SETTINGS_DIR", os.path.expanduser("~/.config/wake-pc")))
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
 last_reset_reason = None
 
 @dataclass
@@ -44,9 +45,10 @@ def _validate_ip(v):
 
 def validate_config(d: dict) -> Config:
     alias = str(d.get("alias", "My PC")).strip()[:32] or "My PC"
-    mac = normalize_mac(d["mac"])
-    ip = _validate_ip(d["ip"])
-    broadcast = _validate_ip(d.get("broadcast", "255.255.255.255"))
+    ip = _validate_ip(str(d.get("ip", "")).strip())
+    mac_raw = str(d.get("mac", "")).strip()
+    mac = normalize_mac(mac_raw) if mac_raw else ""
+    broadcast = _validate_ip(str(d.get("broadcast") or derive_subnet_broadcast(ip) or "255.255.255.255"))
     probe_port = int(d.get("probe_port", 0))
     return Config(alias=alias, mac=mac, ip=ip, broadcast=broadcast, probe_port=probe_port)
 
@@ -63,9 +65,13 @@ def load_config() -> Config:
         return cfg
     try:
         data = json.loads(path.read_text())
-        if data.get("schema_version") != SCHEMA_VERSION:
+        version = data.get("schema_version")
+        if version not in SUPPORTED_SCHEMA_VERSIONS:
             raise ValueError("schema mismatch")
-        return validate_config(data)
+        cfg = validate_config(data)
+        if version != SCHEMA_VERSION:
+            save_config(cfg)
+        return cfg
     except (json.JSONDecodeError, ValueError, KeyError) as e:
         ts = datetime.now().strftime("%Y%m%d%H%M%S")
         backup = path.with_name(path.name + f".bak.{ts}")
