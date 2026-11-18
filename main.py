@@ -15,7 +15,9 @@ try:
 except Exception:
     SETTINGS_DIR = Path(os.environ.get("DECKY_PLUGIN_SETTINGS_DIR", os.path.expanduser("~/.config/wake-pc")))
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
+_ARP_PATH = Path("/proc/net/arp")
 last_reset_reason = None
 
 @dataclass
@@ -44,9 +46,10 @@ def _validate_ip(v):
 
 def validate_config(d: dict) -> Config:
     alias = str(d.get("alias", "My PC")).strip()[:32] or "My PC"
-    mac = normalize_mac(d["mac"])
-    ip = _validate_ip(d["ip"])
-    broadcast = _validate_ip(d.get("broadcast", "255.255.255.255"))
+    ip = _validate_ip(str(d.get("ip", "")).strip())
+    mac_raw = str(d.get("mac", "")).strip()
+    mac = normalize_mac(mac_raw) if mac_raw else ""
+    broadcast = _validate_ip(str(d.get("broadcast") or derive_subnet_broadcast(ip) or "255.255.255.255"))
     probe_port = int(d.get("probe_port", 0))
     return Config(alias=alias, mac=mac, ip=ip, broadcast=broadcast, probe_port=probe_port)
 
@@ -63,9 +66,13 @@ def load_config() -> Config:
         return cfg
     try:
         data = json.loads(path.read_text())
-        if data.get("schema_version") != SCHEMA_VERSION:
+        version = data.get("schema_version")
+        if version not in SUPPORTED_SCHEMA_VERSIONS:
             raise ValueError("schema mismatch")
-        return validate_config(data)
+        cfg = validate_config(data)
+        if version != SCHEMA_VERSION:
+            save_config(cfg)
+        return cfg
     except (json.JSONDecodeError, ValueError, KeyError) as e:
         ts = datetime.now().strftime("%Y%m%d%H%M%S")
         backup = path.with_name(path.name + f".bak.{ts}")
@@ -114,6 +121,18 @@ def derive_subnet_broadcast(ip: str):
     return ".".join(parts[:3] + ["255"])
 
 async def wake(cfg: Config) -> dict:
+    if not cfg.mac:
+        resolved = await resolve_mac(cfg.ip)
+        if not resolved:
+            return {
+                "error": "mac_unknown",
+                "message": "MAC address unknown. Turn the PC on once, save again, or use Discover.",
+            }
+        cfg.mac = resolved
+        try:
+            save_config(cfg)
+        except Exception:
+            pass
     mac = cfg.mac
     packet = build_magic_packet(mac)
     destinations = [cfg.broadcast, derive_subnet_broadcast(cfg.ip), cfg.ip]
@@ -197,7 +216,7 @@ async def status(cfg: Config) -> dict:
 def preflight(cfg: Config, deck_ip) -> list:
     problems = []
     if not cfg.mac:
-        problems.append("missing MAC address")
+        problems.append("MAC not learned yet — turn the PC on once or use Discover")
     if not cfg.ip:
         problems.append("missing IP address")
     # broadcast validity
@@ -233,6 +252,72 @@ def _parse_ip_neigh(text: str, prefix: str) -> list:
                 if mac and mac != "00:00:00:00:00:00":
                     out.append({"ip": parts[0], "mac": mac})
     return out
+
+
+def _find_mac_in_arp(text: str, ip: str):
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[0] == ip and parts[3] != "00:00:00:00:00:00":
+            try:
+                return normalize_mac(parts[3])
+            except ValueError:
+                return None
+    return None
+
+
+def _find_mac_in_neigh(text: str, ip: str):
+    for line in text.splitlines():
+        parts = line.split()
+        if parts and parts[0] == ip and "lladdr" in parts:
+            idx = parts.index("lladdr")
+            if idx + 1 < len(parts) and parts[idx + 1] != "00:00:00:00:00:00":
+                try:
+                    return normalize_mac(parts[idx + 1])
+                except ValueError:
+                    return None
+    return None
+
+
+async def _ping_once(ip: str) -> None:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ping", "-c", "1", "-W", "1", ip,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+    except Exception:
+        return
+    try:
+        await asyncio.wait_for(proc.wait(), 2.0)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            await proc.wait()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+async def resolve_mac(ip: str):
+    await _ping_once(ip)
+    try:
+        if _ARP_PATH.exists():
+            mac = _find_mac_in_arp(_ARP_PATH.read_text(errors="ignore"), ip)
+            if mac:
+                return mac
+    except Exception:
+        pass
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ip", "neigh", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await proc.communicate()
+        return _find_mac_in_neigh(out.decode(errors="ignore"), ip)
+    except Exception:
+        return None
 
 
 async def discover_devices() -> dict:
@@ -310,8 +395,23 @@ class Plugin:
     async def save_config(self, data):
         try:
             cfg = validate_config(data or {})
+            if not cfg.mac:
+                mac = await resolve_mac(cfg.ip)
+                if mac:
+                    cfg.mac = mac
             save_config(cfg)
-            return {"ok": True, "config": asdict(cfg)}
+            return {"ok": True, "config": asdict(cfg), "mac_resolved": bool(cfg.mac)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def learn_mac(self):
+        try:
+            cfg = load_config()
+            mac = await resolve_mac(cfg.ip)
+            if mac:
+                cfg.mac = mac
+                save_config(cfg)
+            return {"mac": mac}
         except Exception as e:
             return {"error": str(e)}
 
@@ -345,6 +445,8 @@ class Plugin:
         try:
             cfg = load_config()
             res = await wake(cfg)
+            if res.get("error"):
+                return {"error": res["error"], "message": res.get("message")}
             return {"rounds": 1, "destinations": res.get("sent_to", []), "failed": res.get("failed", [])}
         except Exception as e:
             return {"error": str(e)}
