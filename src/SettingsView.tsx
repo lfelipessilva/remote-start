@@ -1,21 +1,27 @@
 import React from "react";
-import { ServerAPI } from "@decky/api";
+import { callable } from "@decky/api";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
+
+const getConfig = callable<[], any>("get_config");
+const saveConfig = callable<[any], any>("save_config");
+const testWake = callable<[], any>("test_wake");
+const testProbe = callable<[], any>("test_probe");
 
 interface Config { alias: string; mac: string; ip: string; broadcast: string; probe_port: number; }
 
-export function SettingsView({ serverApi, onBack }: { serverApi: ServerAPI; onBack: () => void }) {
-  const [form, setForm] = React.useState<Config>({ alias: "", mac: "", ip: "", broadcast: "", probe_port: 0 });
+export function SettingsView({ onBack }: { onBack: () => void }) {
+  const [form, setForm] = React.useState<Config>({ alias: "My PC", mac: "", ip: "", broadcast: "255.255.255.255", probe_port: 0 });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [msg, setMsg] = React.useState("");
   const [testRes, setTestRes] = React.useState("");
 
   React.useEffect(() => {
     (async () => {
-      const r: any = await serverApi.callPluginMethod("get_config", {});
-      if (r?.config) setForm(r.config);
+      const r: any = await getConfig();
+      const cfg = r?.config ?? r;
+      if (cfg) setForm({ alias: cfg.alias ?? "My PC", mac: cfg.mac ?? "", ip: cfg.ip ?? "", broadcast: cfg.broadcast ?? "255.255.255.255", probe_port: cfg.probe_port ?? 0 });
     })();
-  }, [serverApi]);
+  }, []);
 
   const set = (k: keyof Config, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -30,19 +36,20 @@ export function SettingsView({ serverApi, onBack }: { serverApi: ServerAPI; onBa
 
   const save = async () => {
     if (!validate()) return;
-    const r: any = await serverApi.callPluginMethod("save_config", form);
+    const r: any = await saveConfig(form);
     if (r?.error) { setMsg(r.error); return; }
-    if (r?.config) setForm(r.config);
+    const cfg = r?.config ?? r;
+    if (cfg) setForm({ alias: cfg.alias ?? form.alias, mac: cfg.mac ?? form.mac, ip: cfg.ip ?? form.ip, broadcast: cfg.broadcast ?? form.broadcast, probe_port: cfg.probe_port ?? form.probe_port });
     setMsg("Saved");
   };
 
-  const testWake = async () => {
-    const r: any = await serverApi.callPluginMethod("test_wake", {});
+  const doTestWake = async () => {
+    const r: any = await testWake();
     if (r?.error) { setTestRes(r.error); return; }
-    setTestRes(`wake: dest=${JSON.stringify(r.destinations)} failed=${JSON.stringify(r.failed)}`);
+    setTestRes(`wake: dest=${JSON.stringify(r.destinations ?? r.sent_to)} failed=${JSON.stringify(r.failed)}`);
   };
-  const testProbe = async () => {
-    const r: any = await serverApi.callPluginMethod("test_probe", {});
+  const doTestProbe = async () => {
+    const r: any = await testProbe();
     if (r?.error) { setTestRes(r.error); return; }
     setTestRes(`probe: method=${r.method} latency=${r.latency_ms}ms online=${r.online}`);
   };
@@ -63,8 +70,8 @@ export function SettingsView({ serverApi, onBack }: { serverApi: ServerAPI; onBa
     field("probe_port", "Probe port"),
     React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: save }, "Save")),
     React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => onBack() }, "Cancel")),
-    React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: testWake }, "Send test packet")),
-    React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: testProbe }, "Test status probe")),
+    React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: doTestWake }, "Send test packet")),
+    React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: doTestProbe }, "Test status probe")),
     msg ? React.createElement(PanelSectionRow, null, React.createElement("div", null, msg)) : null,
     testRes ? React.createElement(PanelSectionRow, null, React.createElement("div", null, testRes)) : null
   );

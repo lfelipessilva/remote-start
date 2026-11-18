@@ -1,15 +1,17 @@
 import React from "react";
-import { ServerAPI } from "@decky/api";
+import { callable } from "@decky/api";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
 
-export function Diagnostics({ serverApi, onBack }: { serverApi: ServerAPI; onBack: () => void }) {
+const getDiagnostics = callable<[], any>("get_diagnostics");
+
+export function Diagnostics({ onBack }: { onBack: () => void }) {
   const [data, setData] = React.useState<any>(null);
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState("");
 
   const load = React.useCallback(async () => {
-    try { const r: any = await serverApi.callPluginMethod("get_diagnostics", {}); setData(r); } catch (e) { setData({ error: String(e) }); }
-  }, [serverApi]);
+    try { const r: any = await getDiagnostics(); setData(r); } catch (e) { setData({ error: String(e) }); }
+  }, []);
 
   React.useEffect(() => { load(); }, [load]);
 

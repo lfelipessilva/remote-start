@@ -10,15 +10,15 @@ const DOT: Record<string, string> = {
   offline: "#ef4444", waking: "#3b82f6", timed_out: "#f59e0b", error: "#ef4444",
 };
 
-function Panel({ serverApi }: any) {
-  const w = useWakeState(serverApi);
+function Panel() {
+  const w = useWakeState();
   const [showSettings, setShowSettings] = React.useState(false);
   const [showDiagnostics, setShowDiagnostics] = React.useState(false);
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   const secs = Math.max(0, Math.ceil((w.rateUntil.current - now) / 1000));
-  if (showSettings) return React.createElement(SettingsView, { serverApi, onBack: () => { setShowSettings(false); w.refresh(); } });
-  if (showDiagnostics) return React.createElement(Diagnostics, { serverApi, onBack: () => { setShowDiagnostics(false); w.refresh(); } });
+  if (showSettings) return React.createElement(SettingsView, { onBack: () => { setShowSettings(false); w.refresh(); } });
+  if (showDiagnostics) return React.createElement(Diagnostics, { onBack: () => { setShowDiagnostics(false); w.refresh(); } });
   return React.createElement(PanelSection, { title: "Wake PC" },
     React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
@@ -42,10 +42,10 @@ function Panel({ serverApi }: any) {
   );
 }
 
-export default definePlugin((serverApi: any) => ({
+export default definePlugin(() => ({
   name: "Wake PC",
-  title: <div className={staticClasses.Title}>Wake PC</div>,
-  content: <Panel serverApi={serverApi} />,
-  icon: <div />,
+  title: React.createElement("div", { className: staticClasses.Title }, "Wake PC"),
+  content: React.createElement(Panel),
+  icon: React.createElement("div", null),
   onDismount() {},
 }));
