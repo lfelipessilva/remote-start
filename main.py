@@ -20,11 +20,11 @@ last_reset_reason = None
 
 @dataclass
 class Config:
-    alias: str = ""
+    alias: str = "My PC"
     mac: str = ""
     ip: str = ""
     broadcast: str = "255.255.255.255"
-    probe_port: int = 445
+    probe_port: int = 0
 
 def normalize_mac(mac: str) -> str:
     s = mac.strip().replace("-", "").replace(":", "").replace(".", "")
@@ -43,11 +43,11 @@ def _validate_ip(v):
     return v
 
 def validate_config(d: dict) -> Config:
-    alias = str(d.get("alias", "")).strip()[:32]
+    alias = str(d.get("alias", "My PC")).strip()[:32] or "My PC"
     mac = normalize_mac(d["mac"])
     ip = _validate_ip(d["ip"])
     broadcast = _validate_ip(d.get("broadcast", "255.255.255.255"))
-    probe_port = int(d.get("probe_port", 445))
+    probe_port = int(d.get("probe_port", 0))
     return Config(alias=alias, mac=mac, ip=ip, broadcast=broadcast, probe_port=probe_port)
 
 def _config_path():

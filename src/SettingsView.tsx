@@ -5,7 +5,7 @@ import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
 interface Config { alias: string; mac: string; ip: string; broadcast: string; probe_port: number; }
 
 export function SettingsView({ serverApi, onBack }: { serverApi: ServerAPI; onBack: () => void }) {
-  const [form, setForm] = React.useState<Config>({ alias: "", mac: "", ip: "", broadcast: "", probe_port: 9 });
+  const [form, setForm] = React.useState<Config>({ alias: "", mac: "", ip: "", broadcast: "", probe_port: 0 });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [msg, setMsg] = React.useState("");
   const [testRes, setTestRes] = React.useState("");

@@ -19,7 +19,8 @@ export function Diagnostics({ serverApi, onBack }: { serverApi: ServerAPI; onBac
     setTimeout(() => setCopied(""), 2000);
   };
 
-  const last = data?.last_attempt ?? data?.lastAttempt ?? null;
+  const entries = Array.isArray(data?.entries) ? data.entries : [];
+  const last = entries.length ? entries[entries.length - 1] : (data?.last_attempt ?? data?.lastAttempt ?? null);
   return React.createElement(PanelSection, { title: "Diagnostics" },
     React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: load }, "Refresh")),
     React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => setOpen(!open) }, `Last attempt ${open ? "▲" : "▼"}`)),

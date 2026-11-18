@@ -18,7 +18,8 @@ export function useWakeState(serverApi: ServerAPI) {
 
   const refresh = useCallback(async () => {
     try {
-      const cfg = await serverApi.callPluginMethod<Config>("get_config", {});
+      const r: any = await serverApi.callPluginMethod("get_config", {});
+      const cfg = (r?.config ?? r) as Config;
       setConfig(cfg);
       if (!cfg || !cfg.mac) { setState("needs_setup"); return; }
       setState("checking");
@@ -51,19 +52,7 @@ export function useWakeState(serverApi: ServerAPI) {
     let cancelled = false;
     try {
       await serverApi.callPluginMethod("wake", {});
-      const start = Date.now();
-      const iv = setInterval(async () => {
-        if (cancelled) { clearInterval(iv); return; }
-        const st = await serverApi.callPluginMethod<Status>("status", {});
-        if (cancelled) { clearInterval(iv); return; }
-        setStatus(st);
-        setLastChecked(Date.now());
-        if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); toaster.toast({ title: `${config?.mac ?? "PC"} is online`, body: "" }); }
-        else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); toaster.toast({ title: "No response after 2 min...", body: "" }); }
-      }, 2000);
-      // unmount guard
-      const cleanup = () => { cancelled = true; clearInterval(iv); };
-      wakeCleanupRef.current = cleanup;
+      // polling handled by the 2s effect loop while state === "waking"
     } catch (e) {
       wakingRef.current = false;
       setState("error");
