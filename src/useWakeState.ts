@@ -33,11 +33,8 @@ export function useWakeState(serverApi: ServerAPI) {
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    const tick = () => { if (wakingRef.current) refresh(); };
-    const id = setInterval(() => {
-      if (wakingRef.current) refresh();
-      else refresh();
-    }, wakingRef.current ? 2000 : 5000);
+    const interval = state === "waking" ? 2000 : 5000;
+    const id = setInterval(() => { refresh(); }, interval);
     return () => clearInterval(id);
   }, [state, refresh]);
 
@@ -48,17 +45,22 @@ export function useWakeState(serverApi: ServerAPI) {
     setTimeout(() => setCanWake(true), 3000);
     wakingRef.current = true;
     setState("waking");
+    let cancelled = false;
     try {
       await serverApi.callPluginMethod("wake", {});
-      // poll
       const start = Date.now();
       const iv = setInterval(async () => {
+        if (cancelled) { clearInterval(iv); return; }
         const st = await serverApi.callPluginMethod<Status>("status", {});
+        if (cancelled) { clearInterval(iv); return; }
         setStatus(st);
         setLastChecked(Date.now());
         if (st?.online) { clearInterval(iv); wakingRef.current = false; setState("online"); }
         else if (Date.now() - start > (config?.timeout ?? 30) * 1000) { clearInterval(iv); wakingRef.current = false; setState("timed_out"); }
       }, 2000);
+      // unmount guard
+      const cleanup = () => { cancelled = true; clearInterval(iv); };
+      (wake as any)._cleanup = cleanup;
     } catch (e) {
       wakingRef.current = false;
       setState("error");

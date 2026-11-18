@@ -273,12 +273,8 @@ var WakePc = (function (React, _manifest) {
         }, [serverApi]);
         React.useEffect(() => { refresh(); }, [refresh]);
         React.useEffect(() => {
-            const id = setInterval(() => {
-                if (wakingRef.current)
-                    refresh();
-                else
-                    refresh();
-            }, wakingRef.current ? 2000 : 5000);
+            const interval = state === "waking" ? 2000 : 5000;
+            const id = setInterval(() => { refresh(); }, interval);
             return () => clearInterval(id);
         }, [state, refresh]);
         const wake = React.useCallback(async () => {
@@ -289,12 +285,20 @@ var WakePc = (function (React, _manifest) {
             setTimeout(() => setCanWake(true), 3000);
             wakingRef.current = true;
             setState("waking");
+            let cancelled = false;
             try {
                 await serverApi.callPluginMethod("wake", {});
-                // poll
                 const start = Date.now();
                 const iv = setInterval(async () => {
+                    if (cancelled) {
+                        clearInterval(iv);
+                        return;
+                    }
                     const st = await serverApi.callPluginMethod("status", {});
+                    if (cancelled) {
+                        clearInterval(iv);
+                        return;
+                    }
                     setStatus(st);
                     setLastChecked(Date.now());
                     if (st?.online) {
@@ -308,6 +312,9 @@ var WakePc = (function (React, _manifest) {
                         setState("timed_out");
                     }
                 }, 2000);
+                // unmount guard
+                const cleanup = () => { cancelled = true; clearInterval(iv); };
+                wake._cleanup = cleanup;
             }
             catch (e) {
                 wakingRef.current = false;
@@ -326,7 +333,7 @@ var WakePc = (function (React, _manifest) {
         const [now, setNow] = React.useState(Date.now());
         React.useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
         const secs = Math.max(0, Math.ceil((w.rateUntil.current - now) / 1000));
-        return React.createElement(PanelSection, { title: "Wake PC" }, React.createElement(PanelSectionRow, null, React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }), React.createElement("span", null, w.state), React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, opacity: 0.7 } }, `checked ${Math.round((now - w.lastChecked) / 1000)}s ago`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); }, disabled: !w.canWake }, w.canWake ? "Wake" : `Wake (${secs}s)`)), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => w.refresh() }, "Refresh")));
+        return React.createElement(PanelSection, { title: "Wake PC" }, React.createElement(PanelSectionRow, null, React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }), React.createElement("span", null, w.state), React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, opacity: 0.7 } }, `checked ${Math.round((now - w.lastChecked) / 1000)}s ago`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); }, disabled: !w.canWake || ["needs_setup", "error", "waking", "timed_out"].includes(w.state) }, (["needs_setup", "error", "waking", "timed_out"].includes(w.state)) ? `Wake (${w.state})` : (w.canWake ? "Wake" : `Wake (${secs}s)`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => w.refresh() }, "Refresh")));
     }
     var index = definePlugin((serverApi) => ({
         name: "Wake PC",

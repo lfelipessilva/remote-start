@@ -22,7 +22,7 @@ function Panel({ serverApi }: any) {
       )
     ),
     React.createElement(PanelSectionRow, null,
-      React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); } , disabled: !w.canWake }, w.canWake ? "Wake" : `Wake (${secs}s)`)
+      React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); }, disabled: !w.canWake || ["needs_setup","error","waking","timed_out"].includes(w.state) }, (["needs_setup","error","waking","timed_out"].includes(w.state)) ? `Wake (${w.state})` : (w.canWake ? "Wake" : `Wake (${secs}s)`))
     ),
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: () => w.refresh() }, "Refresh")
