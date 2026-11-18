@@ -3,6 +3,7 @@ import { definePlugin } from "@decky/api";
 import { PanelSection, PanelSectionRow, ButtonItem, staticClasses } from "@decky/ui";
 import { useWakeState } from "./useWakeState";
 import { SettingsView } from "./SettingsView";
+import { Diagnostics } from "./Diagnostics";
 
 const DOT: Record<string, string> = {
   needs_setup: "#f59e0b", ready: "#94a3b8", checking: "#94a3b8", online: "#22c55e",
@@ -12,10 +13,12 @@ const DOT: Record<string, string> = {
 function Panel({ serverApi }: any) {
   const w = useWakeState(serverApi);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showDiagnostics, setShowDiagnostics] = React.useState(false);
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   const secs = Math.max(0, Math.ceil((w.rateUntil.current - now) / 1000));
   if (showSettings) return React.createElement(SettingsView, { serverApi, onBack: () => { setShowSettings(false); w.refresh(); } });
+  if (showDiagnostics) return React.createElement(Diagnostics, { serverApi, onBack: () => { setShowDiagnostics(false); w.refresh(); } });
   return React.createElement(PanelSection, { title: "Wake PC" },
     React.createElement(PanelSectionRow, null,
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
@@ -32,6 +35,9 @@ function Panel({ serverApi }: any) {
     ),
     React.createElement(PanelSectionRow, null,
       React.createElement(ButtonItem, { layout: "below", onClick: () => setShowSettings(true) }, "Settings")
+    ),
+    React.createElement(PanelSectionRow, null,
+      React.createElement(ButtonItem, { layout: "below", onClick: () => setShowDiagnostics(true) }, "Diagnostics")
     )
   );
 }

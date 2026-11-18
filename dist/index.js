@@ -328,16 +328,107 @@ var WakePc = (function (React, _manifest) {
         return { state, config, status, lastChecked, wake, refresh, canWake, rateUntil };
     }
 
+    function SettingsView({ serverApi, onBack }) {
+        const [form, setForm] = React.useState({ alias: "", mac: "", ip: "", broadcast: "", probe_port: 9 });
+        const [errors, setErrors] = React.useState({});
+        const [msg, setMsg] = React.useState("");
+        const [testRes, setTestRes] = React.useState("");
+        React.useEffect(() => {
+            (async () => {
+                const r = await serverApi.callPluginMethod("get_config", {});
+                if (r?.config)
+                    setForm(r.config);
+            })();
+        }, [serverApi]);
+        const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+        const validate = () => {
+            const e = {};
+            if (!form.mac)
+                e.mac = "required";
+            if (!form.ip)
+                e.ip = "required";
+            if (!form.broadcast)
+                e.broadcast = "required";
+            setErrors(e);
+            return Object.keys(e).length === 0;
+        };
+        const save = async () => {
+            if (!validate())
+                return;
+            const r = await serverApi.callPluginMethod("save_config", form);
+            if (r?.error) {
+                setMsg(r.error);
+                return;
+            }
+            if (r?.config)
+                setForm(r.config);
+            setMsg("Saved");
+        };
+        const testWake = async () => {
+            const r = await serverApi.callPluginMethod("test_wake", {});
+            if (r?.error) {
+                setTestRes(r.error);
+                return;
+            }
+            setTestRes(`wake: dest=${JSON.stringify(r.destinations)} failed=${JSON.stringify(r.failed)}`);
+        };
+        const testProbe = async () => {
+            const r = await serverApi.callPluginMethod("test_probe", {});
+            if (r?.error) {
+                setTestRes(r.error);
+                return;
+            }
+            setTestRes(`probe: method=${r.method} latency=${r.latency_ms}ms online=${r.online}`);
+        };
+        const field = (k, label) => React.createElement(PanelSectionRow, null, React.createElement("div", null, React.createElement("label", null, label), React.createElement("input", { value: form[k], onChange: (e) => set(k, k === "probe_port" ? Number(e.target.value) : e.target.value), onBlur: validate }), errors[k] ? React.createElement("span", { style: { color: "red" } }, errors[k]) : null));
+        return React.createElement(PanelSection, { title: "Settings" }, field("alias", "Alias"), field("mac", "MAC"), field("ip", "IP"), field("broadcast", "Broadcast"), field("probe_port", "Probe port"), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: save }, "Save")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => onBack() }, "Cancel")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: testWake }, "Send test packet")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: testProbe }, "Test status probe")), msg ? React.createElement(PanelSectionRow, null, React.createElement("div", null, msg)) : null, testRes ? React.createElement(PanelSectionRow, null, React.createElement("div", null, testRes)) : null);
+    }
+
+    function Diagnostics({ serverApi, onBack }) {
+        const [data, setData] = React.useState(null);
+        const [open, setOpen] = React.useState(false);
+        const [copied, setCopied] = React.useState("");
+        const load = React.useCallback(async () => {
+            try {
+                const r = await serverApi.callPluginMethod("get_diagnostics", {});
+                setData(r);
+            }
+            catch (e) {
+                setData({ error: String(e) });
+            }
+        }, [serverApi]);
+        React.useEffect(() => { load(); }, [load]);
+        const copy = async () => {
+            const block = JSON.stringify(data, null, 2);
+            try {
+                await navigator.clipboard.writeText(block);
+                setCopied("Copied");
+            }
+            catch {
+                setCopied("Copy failed");
+            }
+            setTimeout(() => setCopied(""), 2000);
+        };
+        const last = data?.last_attempt ?? data?.lastAttempt ?? null;
+        return React.createElement(PanelSection, { title: "Diagnostics" }, React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: load }, "Refresh")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => setOpen(!open) }, `Last attempt ${open ? "▲" : "▼"}`)), open ? React.createElement(PanelSectionRow, null, React.createElement("div", { style: { fontSize: 12 } }, React.createElement("div", null, `timestamp: ${last?.timestamp ?? "-"}`), React.createElement("div", null, `outcome: ${last?.outcome ?? "-"}`), React.createElement("div", null, `destinations: ${JSON.stringify(last?.destinations ?? last?.dests ?? [])}`))) : null, React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: copy }, "Copy diagnostics")), copied ? React.createElement(PanelSectionRow, null, React.createElement("div", null, copied)) : null, React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: onBack }, "Back")));
+    }
+
     const DOT = {
         needs_setup: "#f59e0b", ready: "#94a3b8", checking: "#94a3b8", online: "#22c55e",
         offline: "#ef4444", waking: "#3b82f6", timed_out: "#f59e0b", error: "#ef4444",
     };
     function Panel({ serverApi }) {
         const w = useWakeState(serverApi);
+        const [showSettings, setShowSettings] = React.useState(false);
+        const [showDiagnostics, setShowDiagnostics] = React.useState(false);
         const [now, setNow] = React.useState(Date.now());
         React.useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
         const secs = Math.max(0, Math.ceil((w.rateUntil.current - now) / 1000));
-        return React.createElement(PanelSection, { title: "Wake PC" }, React.createElement(PanelSectionRow, null, React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }), React.createElement("span", null, w.state), React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, opacity: 0.7 } }, `checked ${Math.round((now - w.lastChecked) / 1000)}s ago`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); }, disabled: !w.canWake || ["needs_setup", "error", "waking", "timed_out"].includes(w.state) }, (["needs_setup", "error", "waking", "timed_out"].includes(w.state)) ? `Wake (${w.state})` : (w.canWake ? "Wake" : `Wake (${secs}s)`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => w.refresh() }, "Refresh")));
+        if (showSettings)
+            return React.createElement(SettingsView, { serverApi, onBack: () => { setShowSettings(false); w.refresh(); } });
+        if (showDiagnostics)
+            return React.createElement(Diagnostics, { serverApi, onBack: () => { setShowDiagnostics(false); w.refresh(); } });
+        return React.createElement(PanelSection, { title: "Wake PC" }, React.createElement(PanelSectionRow, null, React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: DOT[w.state] } }), React.createElement("span", null, w.state), React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, opacity: 0.7 } }, `checked ${Math.round((now - w.lastChecked) / 1000)}s ago`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: async () => { await w.wake(); }, disabled: !w.canWake || ["needs_setup", "error", "waking", "timed_out"].includes(w.state) }, (["needs_setup", "error", "waking", "timed_out"].includes(w.state)) ? `Wake (${w.state})` : (w.canWake ? "Wake" : `Wake (${secs}s)`))), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => w.refresh() }, "Refresh")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => setShowSettings(true) }, "Settings")), React.createElement(PanelSectionRow, null, React.createElement(ButtonItem, { layout: "below", onClick: () => setShowDiagnostics(true) }, "Diagnostics")));
     }
     var index = definePlugin((serverApi) => ({
         name: "Wake PC",
