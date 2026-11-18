@@ -115,7 +115,7 @@ def derive_subnet_broadcast(ip: str):
 async def wake(cfg: Config) -> dict:
     mac = cfg.mac
     packet = build_magic_packet(mac)
-    destinations = [cfg.broadcast, derive_subnet_broadcast(cfg.ip)]
+    destinations = [cfg.broadcast, derive_subnet_broadcast(cfg.ip), cfg.ip]
     destinations = [d for d in destinations if d]
     # unique
     seen = set()
@@ -129,7 +129,7 @@ async def wake(cfg: Config) -> dict:
     loop = asyncio.get_event_loop()
     for dest in uniq:
         for port in (9, 7):
-            for _ in range(3):
+            for i in range(3):
                 try:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -140,6 +140,8 @@ async def wake(cfg: Config) -> dict:
                 except Exception:
                     if dest not in failed:
                         failed.append(dest)
+                if i < 2:
+                    await asyncio.sleep(0.15)
     return {"mac": mac, "sent_to": sent_to, "failed": failed}
 
 class Plugin:
