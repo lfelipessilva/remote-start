@@ -8,8 +8,12 @@ export default {
     file: "dist/index.js",
     format: "iife",
     name: "WakePc",
-    globals: { react: "React" }
+    globals: {
+      react: "SP_REACT",
+      "react-dom": "SP_REACTDOM",
+      "@decky/manifest": "_manifest",
+    },
   },
+  external: ["react", "react-dom", "@decky/manifest"],
   plugins: [resolve(), commonjs(), typescript({ tsconfig: "./tsconfig.json" })],
-  external: ["react"]
 };
