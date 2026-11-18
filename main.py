@@ -92,3 +92,15 @@ def reset_config(reason) -> Config:
     cfg = Config()
     save_config(cfg)
     return cfg
+
+
+class Plugin:
+    async def main(self):
+        pass
+
+
+plugin = Plugin()
+try:
+    decky.run(plugin) if hasattr(decky, "run") else None
+except NameError:
+    pass
