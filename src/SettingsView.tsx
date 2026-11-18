@@ -139,24 +139,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   };
 
   const setupShutdown = () => {
-    openShutdownSetup(form.ssh_user, async (user, password) => {
-      setShutdownBusy(true);
-      setShutdownMsg("Connecting to the PC…");
-      setShutdownCommand("");
-      try {
-        const r: any = await configureShutdown(user, password);
-        if (r?.error) {
-          setShutdownMsg(r.message ?? r.error);
-          if (r.command) setShutdownCommand(r.command);
-          return;
-        }
-        setForm((f) => ({ ...f, ssh_user: r.user ?? user }));
-        setShutdownMsg("Shutdown configured. The password was not saved.");
-      } catch (e) {
-        setShutdownMsg(String(e));
-      } finally {
-        setShutdownBusy(false);
-      }
+    openShutdownSetup(form.ssh_user, (user) => {
+      setForm((f) => ({ ...f, ssh_user: user }));
+      setShutdownMsg("Shutdown configured. The password was not saved.");
     });
   };
 
