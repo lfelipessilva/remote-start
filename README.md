@@ -1,53 +1,137 @@
 # Wake PC
 
-Decky Loader plugin to wake a PC via Wake-on-LAN from the Steam Deck's Quick Access Menu.
+A Decky Loader plugin that turns your PC on from the Steam Deck's Quick Access
+Menu using Wake-on-LAN, and shows whether the PC is currently on.
 
-## Install
+## Quick start (3 steps)
 
-1. Build the plugin with the Decky CLI:
-   ```sh
-   decky plugin build
-   ```
-2. The build produces a zip in `dist/`.
-3. On the Deck, open Decky Loader → Settings → **Install from zip** and select the zip.
+1. **Find your PC's MAC address and LAN IP** (see below).
+2. **Enter them once** in the plugin: QAM → **Wake PC** → **Settings**. Save.
+3. **Press Wake.** Watch the dot: Offline → Waking → Online.
 
-No shell access required. The plugin does not request root.
+There is **no automatic discovery** in this version. The plugin cannot see a PC
+that is switched off (a powered-off network card does not answer), so discovery
+would only ever work while the PC is already on — which defeats the purpose.
+Instead you enter the MAC once and it is saved.
 
-## Configuration
+## Where to find the values
 
-Open the plugin panel in the QAM, then tap the gear icon for Settings. Fields:
+### Windows
 
-| field | meaning | default |
-|-------|---------|---------|
-| Alias | display name, e.g. "Gaming PC" | `My PC` |
-| MAC address | target MAC, `aa:bb:cc:dd:ee:ff` or 12 hex chars | required |
-| PC IP | LAN IPv4, used for probing and as an extra packet target | required |
-| Broadcast | subnet broadcast address | `255.255.255.255` |
-| Probe port | optional TCP port proving the PC is up (22, 445, 3389) | ping only |
+Open Command Prompt or PowerShell on the PC:
 
-Validation happens on Save; invalid input shows a per-field error and Save stays disabled. If the PC's IP changes (DHCP), status shows Offline until the IP field is updated.
+```bat
+ipconfig /all
+```
+
+- **MAC address**: the *Physical Address* of the active adapter (e.g.
+  `AA-BB-CC-DD-EE-FF`). Enter it as `AA:BB:CC:DD:EE:FF` or `AABBCCDDEEFF`.
+- **PC IP**: the *IPv4 Address* of the same adapter (e.g. `192.168.1.42`).
+
+To avoid the IP changing later, give the PC a DHCP reservation in your router,
+or set a static IP.
+
+### Linux
+
+```sh
+ip link          # MAC after "link/ether"
+ip -4 addr       # IPv4 after "inet"
+```
+
+## What each field means
+
+| Field | What to put | Example |
+|-------|-------------|---------|
+| Alias | Name shown in the panel | `Gaming PC` |
+| MAC address | The PC's network card MAC | `aa:bb:cc:dd:ee:ff` |
+| PC IP | The PC's LAN IPv4 (used for status) | `192.168.1.42` |
+| Broadcast | Where the wake packet is sent | `255.255.255.255` |
+| Probe port | Optional TCP port for status (22, 445, 3389) | empty = ping only |
+
+Only **MAC** and **PC IP** are required. Defaults work for most home networks.
+
+## What the buttons do
+
+- **Wake** — sends the magic packet and watches for the PC to answer for up to
+  2 minutes. Disabled while the PC is already online or during an attempt.
+- **Refresh** — re-checks the status right now.
+- **Settings** — edit the fields above. Nothing is written until you press Save.
+- **Send test packet** — sends one wake round and reports where it went. Useful
+  to check the broadcast address without waiting for a boot.
+- **Test status probe** — runs the online check once and shows the method
+  (ping/TCP) and latency. Useful to confirm the IP is right.
+- **Diagnostics** — last attempts, destinations, and a **Copy diagnostics**
+  button for support.
+
+## Status meanings
+
+| Dot / state | Meaning |
+|-------------|---------|
+| `needs_setup` | MAC or IP missing — open Settings |
+| `online` | PC answered ping or the probe port |
+| `offline` | No answer. Either the PC is off, or it is on but blocks ICMP and no probe port is set |
+| `waking` | Wake sent, waiting for the PC to answer |
+| `timed_out` | 2 minutes passed with no answer |
+| `error` | Backend call failed — check Diagnostics / Decky logs |
+
+`offline` while the PC is actually on almost always means ICMP is blocked. Set
+**Probe port** to a port the PC listens on (22 for SSH, 445 for SMB, 3389 for
+RDP) and save.
 
 ## Enable Wake-on-LAN on the PC
 
-- Enable WoL in the BIOS/UEFI (often under "Power Management" / "Wake on LAN").
-- In Windows, set the NIC's "Wake on Magic Packet" to Enabled in Device Manager.
-- The NIC must stay powered in soft-off.
+- Enable **Wake on LAN / Wake on Magic Packet** in the BIOS/UEFI.
+- Windows: Device Manager → network adapter → Properties → Power Management →
+  allow this device to wake the computer; Advanced → *Wake on Magic Packet* =
+  Enabled.
+- The network card must stay powered while the PC is off (usually a BIOS
+  "ErP" setting that must be disabled).
 
-## Windows Fast Startup
+## Common reasons a wake fails
 
-Windows Fast Startup can leave the NIC in a state where the PC wakes from sleep but not from a full shutdown. If Wake works after sleep but not from shutdown, disable Fast Startup in Windows power options.
+- **Windows Fast Startup** — the PC wakes from sleep but not from shutdown.
+  Disable Fast Startup in Control Panel → Power Options → *Choose what the power
+  buttons do*.
+- **Wrong network** — Deck and PC must be on the same subnet.
+- **AP client isolation** — some routers block client-to-client broadcast. Put
+  your subnet broadcast (e.g. `192.168.1.255`) in the Broadcast field.
+- **PC IP changed** — DHCP handed out a new address; update the PC IP field.
+- **Ethernet unplugged / Wi-Fi off** — WoL over Wi-Fi is often unreliable; a
+  wired connection is the safe option.
 
-## AP client isolation
+## Install / update
 
-Some access points block client-to-client broadcast. If packets cannot be sent to `255.255.255.255`, try the subnet broadcast (e.g. `192.168.1.255`) in the Broadcast field.
+Build the zip:
+
+```sh
+pnpm install
+pnpm package      # produces wake-pc.zip
+```
+
+The zip must contain one top-level folder named `wake-pc/`. `pnpm package`
+handles that.
+
+Install on the Deck:
+
+```sh
+scp wake-pc.zip deck@<deck-ip>:/home/deck/
+ssh deck@<deck-ip>
+unzip -o /home/deck/wake-pc.zip -d /tmp/wake-pc-install
+sudo rm -rf /home/deck/homebrew/plugins/wake-pc
+sudo cp -r /tmp/wake-pc-install/wake-pc /home/deck/homebrew/plugins/wake-pc
+sudo systemctl restart plugin_loader
+```
+
+Or use Decky → Developer → *Install Plugin from ZIP File*.
 
 ## Troubleshooting
 
-| Failsafe message | Fix |
-|------------------|-----|
-| `Offline after 2 min: the packet was sent but the PC never answered. Check that WoL is enabled and that Fast Startup is off.` | Enable WoL in BIOS/NIC; disable Windows Fast Startup. |
-| `Probe failed for both ping and port 445. Try a different probe port or enable ICMP on the PC.` | Change Probe port or allow ICMP on the PC firewall. |
-| `Broadcast 255.255.255.255 could not be sent: the Deck may be on client isolation. Try your subnet broadcast (e.g. 192.168.1.255).` | Use the subnet broadcast address in Broadcast. |
-| `Deck is not on a network` | Connect the Deck to Wi-Fi/LAN. |
-| `Add a MAC address in Settings` | Enter MAC and IP in Settings, then Save. |
-| Corrupt config | Plugin backs up and resets to defaults with a toast on load. |
+| Symptom | Fix |
+|---------|-----|
+| Plugin does not appear in Decky | Zip had no `wake-pc/` top-level folder, or the file name did not match. Rebuild with `pnpm package` and reinstall. |
+| `manifest is not defined` / `React is not defined` | Old build. Rebuild and reinstall; the current build uses `@decky/rollup`. |
+| Wake sent but PC stays off | Check WoL in BIOS and NIC; disable Fast Startup; confirm same subnet. |
+| Status says Offline while PC is on | Set a Probe port, or allow ICMP through the PC firewall. |
+| Status is stale | Press Refresh; polling is every 5 s while the panel is open. |
+
+Decky backend logs: `journalctl -u plugin_loader -n 100 --no-pager`.
