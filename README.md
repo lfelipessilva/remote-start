@@ -48,12 +48,6 @@ sudo cp -r "/tmp/remote-start-install/Remote Start" "/home/deck/homebrew/plugins
 sudo systemctl restart plugin_loader
 ```
 
-> **Upgrading from the old "Wake PC" build:** the plugin was renamed, so the
-> plugin folder and settings folder changed. Remove the old
-> `homebrew/plugins/remote-start` folder (the command above does it), then open
-> **Remote Start → Settings** and enter the PC IP once. The old config and
-> shutdown key in `homebrew/settings/remote-start` are not reused and can be deleted.
-
 ### Build from source
 
 ```sh
@@ -63,18 +57,9 @@ pnpm package      # produces remote-start.zip
 
 The zip contains one top-level folder named `Remote Start/`.
 
-To publish a release (which uploads `remote-start.zip`), bump the version in
-`plugin.json` and `package.json`, then push a matching tag:
-
-```sh
-git tag v0.1.3
-git push origin v0.1.3
-```
-
-The workflow `.github/workflows/release.yml` builds the zip and attaches
-`remote-start.zip` to the GitHub release.
-
 ## Quick start (3 steps)
+
+Required: have Wake-on-Lan enabled in your PC, see [Enable Wake-on-LAN on the PC](#enable-wake-on-lan-on-the-pc)
 
 1. **Turn the PC on once** (the plugin learns its MAC from the network; a
    switched-off PC is invisible).
