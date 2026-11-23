@@ -18,6 +18,62 @@ down again over SSH.
 > [`remote-start.zip`](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)
 > — see [Install / update](#install--update).
 
+## Install / update
+
+[![Latest release](https://img.shields.io/github/v/release/lfelipessilva/remote-start)](https://github.com/lfelipessilva/remote-start/releases/latest)
+[![Download remote-start.zip](https://img.shields.io/badge/download-remote--start.zip-38bdf8)](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)
+
+1. **Download the latest `remote-start.zip`** from the
+   [Releases page](https://github.com/lfelipessilva/remote-start/releases/latest)
+   (direct link:
+   [`remote-start.zip`](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)).
+   Do this in Desktop Mode on the Deck, or transfer the file with `scp`.
+2. In Decky Loader, open **Decky → Developer → Install Plugin from ZIP File**
+   and select the downloaded `remote-start.zip`. If the Developer section is
+   hidden, enable **Developer Mode** in Decky's settings first.
+3. Restart Decky when prompted (or run `sudo systemctl restart plugin_loader`).
+4. Open the Quick Access Menu → **Remote Start**.
+
+To **update**, download the newest release and install it the same way. Your
+settings and the shutdown SSH key are kept.
+
+### Install from the command line (optional)
+
+```sh
+scp remote-start.zip deck@<deck-ip>:/home/deck/
+ssh deck@<deck-ip>
+unzip -o /home/deck/remote-start.zip -d /tmp/remote-start-install
+sudo rm -rf "/home/deck/homebrew/plugins/Remote Start" "/home/deck/homebrew/plugins/remote-start.zip"
+sudo cp -r "/tmp/remote-start-install/Remote Start" "/home/deck/homebrew/plugins/Remote Start"
+sudo systemctl restart plugin_loader
+```
+
+> **Upgrading from the old "Wake PC" build:** the plugin was renamed, so the
+> plugin folder and settings folder changed. Remove the old
+> `homebrew/plugins/remote-start` folder (the command above does it), then open
+> **Remote Start → Settings** and enter the PC IP once. The old config and
+> shutdown key in `homebrew/settings/remote-start` are not reused and can be deleted.
+
+### Build from source
+
+```sh
+pnpm install
+pnpm package      # produces remote-start.zip
+```
+
+The zip contains one top-level folder named `Remote Start/`.
+
+To publish a release (which uploads `remote-start.zip`), bump the version in
+`plugin.json` and `package.json`, then push a matching tag:
+
+```sh
+git tag v0.1.3
+git push origin v0.1.3
+```
+
+The workflow `.github/workflows/release.yml` builds the zip and attaches
+`remote-start.zip` to the GitHub release.
+
 ## Quick start (3 steps)
 
 1. **Turn the PC on once** (the plugin learns its MAC from the network; a
@@ -225,62 +281,6 @@ PC, and skip it if the PC holds sensitive data.
 - **PC IP changed** — DHCP handed out a new address; update the PC IP field.
 - **Ethernet unplugged / Wi-Fi off** — WoL over Wi-Fi is often unreliable; a
   wired connection is the safe option.
-
-## Install / update
-
-[![Latest release](https://img.shields.io/github/v/release/lfelipessilva/remote-start)](https://github.com/lfelipessilva/remote-start/releases/latest)
-[![Download remote-start.zip](https://img.shields.io/badge/download-remote--start.zip-38bdf8)](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)
-
-1. **Download the latest `remote-start.zip`** from the
-   [Releases page](https://github.com/lfelipessilva/remote-start/releases/latest)
-   (direct link:
-   [`remote-start.zip`](https://github.com/lfelipessilva/remote-start/releases/latest/download/remote-start.zip)).
-   Do this in Desktop Mode on the Deck, or transfer the file with `scp`.
-2. In Decky Loader, open **Decky → Developer → Install Plugin from ZIP File**
-   and select the downloaded `remote-start.zip`. If the Developer section is
-   hidden, enable **Developer Mode** in Decky's settings first.
-3. Restart Decky when prompted (or run `sudo systemctl restart plugin_loader`).
-4. Open the Quick Access Menu → **Remote Start**.
-
-To **update**, download the newest release and install it the same way. Your
-settings and the shutdown SSH key are kept.
-
-### Install from the command line (optional)
-
-```sh
-scp remote-start.zip deck@<deck-ip>:/home/deck/
-ssh deck@<deck-ip>
-unzip -o /home/deck/remote-start.zip -d /tmp/remote-start-install
-sudo rm -rf "/home/deck/homebrew/plugins/Remote Start" "/home/deck/homebrew/plugins/remote-start.zip"
-sudo cp -r "/tmp/remote-start-install/Remote Start" "/home/deck/homebrew/plugins/Remote Start"
-sudo systemctl restart plugin_loader
-```
-
-> **Upgrading from the old "Wake PC" build:** the plugin was renamed, so the
-> plugin folder and settings folder changed. Remove the old
-> `homebrew/plugins/remote-start` folder (the command above does it), then open
-> **Remote Start → Settings** and enter the PC IP once. The old config and
-> shutdown key in `homebrew/settings/remote-start` are not reused and can be deleted.
-
-### Build from source
-
-```sh
-pnpm install
-pnpm package      # produces remote-start.zip
-```
-
-The zip contains one top-level folder named `Remote Start/`.
-
-To publish a release (which uploads `remote-start.zip`), bump the version in
-`plugin.json` and `package.json`, then push a matching tag:
-
-```sh
-git tag v0.1.3
-git push origin v0.1.3
-```
-
-The workflow `.github/workflows/release.yml` builds the zip and attaches
-`remote-start.zip` to the GitHub release.
 
 ## Troubleshooting
 
